@@ -59,7 +59,6 @@ for domain in \
     "statsig.anthropic.com" \
     "bun.sh" \
     "shadcn.com" \
-    "ui.adpharm.digital" \
     "statsig.com"; do
     echo "Resolving $domain..."
     # First try to get A records directly

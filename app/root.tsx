@@ -8,6 +8,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import type { Theme } from "~/lib/preferences/preference-types";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -19,9 +20,25 @@ export const links: Route.LinksFunction = () => [
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap",
   },
 ];
+
+/** Reads theme preference from cookie for SSR-safe rendering */
+export function loader({ request }: Route.LoaderArgs) {
+  const cookie = request.headers.get("cookie") ?? "";
+  const match = cookie.split("; ").find((row) => row.startsWith("user_preferences="));
+  let theme: Theme = "system";
+  if (match) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(match.split("=")[1]));
+      if (parsed?.theme) theme = parsed.theme as Theme;
+    } catch {
+      // ignore
+    }
+  }
+  return { theme };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
