@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams, Link, useFetcher } from "react-router";
+import { useSearchParams, Link, useFetcher } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
 import { eq } from "drizzle-orm";
@@ -8,7 +8,6 @@ import { db } from "~/lib/db/client";
 import { users, userCredentials } from "~/lib/db/schema";
 import { getSessionUser, createSession, buildSessionCookie } from "~/lib/auth/session.server";
 import { LogoMark } from "~/components/layout/logo-mark";
-import { serverEnv } from "~/lib/env/env.defaults.server";
 
 export function meta() {
   return [{ title: "Sign In — Minashow" }];
