@@ -1,6 +1,6 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "Mina Show",
+  "short_name": "Mina Show",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
