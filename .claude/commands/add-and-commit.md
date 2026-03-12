@@ -52,6 +52,7 @@ Entries must follow this exact structure:
 - Code organization changes that don't affect behavior
 - Minor UI polish (spacing, colors, fonts)
 - Vague statements like "improved UX" or "better styling"
+- Any comments that say Made with Cursor, or done by cursor, or anything mentioning what it was made with
 
 **Test: Would a developer returning after 1 month need to know this?**
 If the answer is no, omit it.
