@@ -20,10 +20,9 @@ export const routePaths = [
   "/login",
   "/logout",
   "/product/:id",
+  "/profile",
   "/shop",
   "/shop/:category",
-  "/sounds",
-  "/volunteer",
 ] as const;
 export type Path = (typeof routePaths)[number];
 

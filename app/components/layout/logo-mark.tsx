@@ -6,7 +6,7 @@ export function LogoMark({ size = 32 }: { size?: number }) {
       alt="Minashow"
       width={size}
       height={size}
-      style={{ width: size, height: size, objectFit: "contain" }}
+      className="py-5"
     />
   );
 }

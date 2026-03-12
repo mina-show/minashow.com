@@ -15,16 +15,10 @@ export function MiniPlayer() {
   };
 
   return (
-    <div
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 shadow-lg"
-      style={{ borderColor: "#a9d937" }}
-    >
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-brand-green shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
         {/* Thumbnail */}
-        <div
-          className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
-          style={{ backgroundColor: "#e8f5bc" }}
-        >
+        <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-brand-green-light">
           {currentTrack.thumbnail ? (
             <img
               src={currentTrack.thumbnail}
@@ -32,7 +26,7 @@ export function MiniPlayer() {
               className="w-full h-full object-cover"
             />
           ) : (
-            <Music className="w-5 h-5" style={{ color: "#a9d937" }} />
+            <Music className="w-5 h-5 text-brand-green" />
           )}
         </div>
 
@@ -54,8 +48,7 @@ export function MiniPlayer() {
         {/* Play / Pause */}
         <button
           onClick={isPlaying ? pause : resume}
-          className="w-9 h-9 rounded-full text-white flex items-center justify-center shrink-0 transition-colors hover:opacity-90"
-          style={{ backgroundColor: "#a9d937" }}
+          className="w-9 h-9 rounded-full bg-brand-green text-white flex items-center justify-center shrink-0 transition-colors hover:opacity-90"
           aria-label={isPlaying ? "Pause" : "Resume"}
         >
           {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
@@ -73,9 +66,10 @@ export function MiniPlayer() {
             aria-label="Seek"
             aria-valuenow={Math.round(progress * 100)}
           >
+            {/* width is dynamic — must stay in style; color moved to className */}
             <div
-              className="absolute left-0 top-0 h-full rounded-full transition-all"
-              style={{ width: `${progress * 100}%`, backgroundColor: "#a9d937" }}
+              className="absolute left-0 top-0 h-full rounded-full transition-all bg-brand-green"
+              style={{ width: `${progress * 100}%` }}
             />
           </div>
           <span className="text-xs text-gray-400 shrink-0 font-sans">

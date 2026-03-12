@@ -1,5 +1,5 @@
 import { useParams } from "react-router";
-import { ShopPage } from "./shop";
+import { ShopPage } from "./_layout.shop";
 
 export function meta() {
   return [{ title: "Shop — Minashow" }];

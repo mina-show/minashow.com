@@ -91,13 +91,9 @@ export function ShopPage({ initialCategory = "all" }: { initialCategory?: string
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-4 py-1.5 rounded-full text-sm transition-all border font-semibold font-sans ${selectedCategory === cat.id
-                  ? "text-white shadow-sm"
+                  ? `text-white shadow-sm ${cat.activeClass}`
                   : `bg-white ${cat.textClass} ${cat.borderClass}`
                   }`}
-                style={{
-                  backgroundColor:
-                    selectedCategory === cat.id ? cat.color : undefined,
-                }}
               >
                 {cat.name}
               </button>

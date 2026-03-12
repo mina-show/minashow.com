@@ -1,17 +1,13 @@
 import { useState, useEffect } from "react";
 import { useFetcher, useLoaderData, redirect } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { eq, asc, desc, and } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { db } from "~/lib/db/client";
 import {
   categories,
   products,
   sounds,
-  soundCategories,
-  soundTags,
-  soundTagAssignments,
   orders,
-  users,
 } from "~/lib/db/schema";
 import { requireAdmin } from "~/lib/auth/admin.server";
 import { Button } from "~/components/ui/button";
@@ -37,9 +33,7 @@ import {
   LayoutGrid,
   Package,
   Music,
-  Tag,
   ClipboardList,
-  Layers,
   Pencil,
   Trash2,
   Plus,
@@ -82,34 +76,22 @@ function nullableNum(fd: FormData, k: string): number | null {
 export async function loader({ request }: LoaderFunctionArgs) {
   await requireAdmin(request);
 
-  const [
-    allCategories,
-    allProducts,
-    allSoundCategories,
-    allSounds,
-    allTags,
-    allOrders,
-  ] = await Promise.all([
+  const [allCategories, allProducts, allSounds, allOrders] = await Promise.all([
     db.query.categories.findMany({ orderBy: [asc(categories.sortOrder), asc(categories.name)] }),
     db.query.products.findMany({
       with: { category: true },
       orderBy: [asc(products.categoryId), asc(products.sortOrder)],
     }),
-    db.query.soundCategories.findMany({
-      orderBy: [asc(soundCategories.sortOrder), asc(soundCategories.name)],
-    }),
     db.query.sounds.findMany({
-      with: { category: true, tagAssignments: { with: { tag: true } } },
       orderBy: [asc(sounds.sortOrder), asc(sounds.title)],
     }),
-    db.query.soundTags.findMany({ orderBy: [asc(soundTags.name)] }),
     db.query.orders.findMany({
       with: { items: { with: { category: true } }, user: true },
       orderBy: [desc(orders.createdAt)],
     }),
   ]);
 
-  return { allCategories, allProducts, allSoundCategories, allSounds, allTags, allOrders };
+  return { allCategories, allProducts, allSounds, allOrders };
 }
 
 // ─── Action ───────────────────────────────────────────────────────────────────
@@ -188,76 +170,21 @@ export async function action({ request }: ActionFunctionArgs) {
       break;
     }
 
-    // ── Sound categories ──────────────────────────────────────────────────
-    case "create-sound-category": {
-      const name = str(fd, "name");
-      await db.insert(soundCategories).values({
-        name,
-        slug: str(fd, "slug") || slugify(name),
+    // ── Sounds ────────────────────────────────────────────────────────────
+    case "create-sound": {
+      await db.insert(sounds).values({
+        title: str(fd, "title"),
+        artist: str(fd, "artist"),
+        durationSeconds: num(fd, "durationSeconds"),
+        previewDurationSeconds: nullableNum(fd, "previewDurationSeconds"),
+        thumbnailUrl: nullableStr(fd, "thumbnailUrl"),
+        audioUrl: nullableStr(fd, "audioUrl"),
         sortOrder: num(fd, "sortOrder"),
         isActive: bool(fd, "isActive"),
       });
       break;
     }
-    case "update-sound-category": {
-      const name = str(fd, "name");
-      await db
-        .update(soundCategories)
-        .set({
-          name,
-          slug: str(fd, "slug") || slugify(name),
-          sortOrder: num(fd, "sortOrder"),
-          isActive: bool(fd, "isActive"),
-          updatedAt: new Date(),
-        })
-        .where(eq(soundCategories.id, str(fd, "id")));
-      break;
-    }
-    case "delete-sound-category": {
-      await db.delete(soundCategories).where(eq(soundCategories.id, str(fd, "id")));
-      break;
-    }
-
-    // ── Sound tags ────────────────────────────────────────────────────────
-    case "create-sound-tag": {
-      const name = str(fd, "name");
-      await db.insert(soundTags).values({ name, slug: slugify(name) });
-      break;
-    }
-    case "update-sound-tag": {
-      const name = str(fd, "name");
-      await db
-        .update(soundTags)
-        .set({ name, slug: slugify(name) })
-        .where(eq(soundTags.id, str(fd, "id")));
-      break;
-    }
-    case "delete-sound-tag": {
-      await db.delete(soundTags).where(eq(soundTags.id, str(fd, "id")));
-      break;
-    }
-
-    // ── Sounds ────────────────────────────────────────────────────────────
-    case "create-sound": {
-      const [sound] = await db
-        .insert(sounds)
-        .values({
-          title: str(fd, "title"),
-          artist: str(fd, "artist"),
-          durationSeconds: num(fd, "durationSeconds"),
-          previewDurationSeconds: nullableNum(fd, "previewDurationSeconds"),
-          thumbnailUrl: nullableStr(fd, "thumbnailUrl"),
-          audioUrl: nullableStr(fd, "audioUrl"),
-          categoryId: nullableStr(fd, "categoryId"),
-          sortOrder: num(fd, "sortOrder"),
-          isActive: bool(fd, "isActive"),
-        })
-        .returning();
-      await syncSoundTags(sound.id, str(fd, "tagIds"));
-      break;
-    }
     case "update-sound": {
-      const soundId = str(fd, "id");
       await db
         .update(sounds)
         .set({
@@ -267,13 +194,11 @@ export async function action({ request }: ActionFunctionArgs) {
           previewDurationSeconds: nullableNum(fd, "previewDurationSeconds"),
           thumbnailUrl: nullableStr(fd, "thumbnailUrl"),
           audioUrl: nullableStr(fd, "audioUrl"),
-          categoryId: nullableStr(fd, "categoryId"),
           sortOrder: num(fd, "sortOrder"),
           isActive: bool(fd, "isActive"),
           updatedAt: new Date(),
         })
-        .where(eq(sounds.id, soundId));
-      await syncSoundTags(soundId, str(fd, "tagIds"));
+        .where(eq(sounds.id, str(fd, "id")));
       break;
     }
     case "delete-sound": {
@@ -294,25 +219,15 @@ export async function action({ request }: ActionFunctionArgs) {
   return { ok: true };
 }
 
-/** Replace all tag assignments for a sound with a new comma-separated list of tag IDs. */
-async function syncSoundTags(soundId: string, tagIds: string) {
-  await db.delete(soundTagAssignments).where(eq(soundTagAssignments.soundId, soundId));
-  const ids = tagIds.split(",").map((t) => t.trim()).filter(Boolean);
-  if (ids.length === 0) return;
-  await db.insert(soundTagAssignments).values(ids.map((tagId) => ({ soundId, tagId })));
-}
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type LoaderData = Awaited<ReturnType<typeof loader>>;
 type Category = LoaderData["allCategories"][number];
 type Product = LoaderData["allProducts"][number];
-type SoundCategory = LoaderData["allSoundCategories"][number];
 type Sound = LoaderData["allSounds"][number];
-type SoundTag = LoaderData["allTags"][number];
 type Order = LoaderData["allOrders"][number];
 
-type Section = "orders" | "categories" | "products" | "sounds" | "sound-categories" | "tags";
+type Section = "orders" | "categories" | "products" | "sounds";
 
 // ─── Shared row wrapper ────────────────────────────────────────────────────────
 
@@ -327,9 +242,8 @@ function Row({ children }: { children: React.ReactNode }) {
 function ActiveBadge({ isActive }: { isActive: boolean }) {
   return (
     <span
-      className={`text-xs px-2 py-0.5 rounded-full font-bold font-sans ${
-        isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-      }`}
+      className={`text-xs px-2 py-0.5 rounded-full font-bold font-sans ${isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+        }`}
     >
       {isActive ? "Active" : "Inactive"}
     </span>
@@ -379,13 +293,7 @@ function DeleteButton({ intent, id }: { intent: string; id: string }) {
 
 // ─── Field helpers ─────────────────────────────────────────────────────────────
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="font-sans font-semibold text-gray-700">{label}</Label>
@@ -413,19 +321,18 @@ function CategoriesSection({ data }: { data: Category[] }) {
       setForm(
         item
           ? {
-              name: item.name,
-              slug: item.slug,
-              description: item.description ?? "",
-              priceCents: String(item.priceCents),
-              sortOrder: String(item.sortOrder),
-              isActive: item.isActive,
-            }
+            name: item.name,
+            slug: item.slug,
+            description: item.description ?? "",
+            priceCents: String(item.priceCents),
+            sortOrder: String(item.sortOrder),
+            isActive: item.isActive,
+          }
           : { name: "", slug: "", description: "", priceCents: "0", sortOrder: "0", isActive: true }
       );
     }
   }, [open, item?.id]);
 
-  // close sheet after successful action
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data) setOpen(false);
   }, [fetcher.state, fetcher.data]);
@@ -434,11 +341,7 @@ function CategoriesSection({ data }: { data: Category[] }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-display text-xl font-semibold text-gray-900">Categories</h2>
-        <Button
-          size="sm"
-          onClick={() => { setSheet({ item: null }); setOpen(true); }}
-          className="gap-1.5"
-        >
+        <Button size="sm" onClick={() => { setSheet({ item: null }); setOpen(true); }} className="gap-1.5">
           <Plus className="w-4 h-4" /> Add
         </Button>
       </div>
@@ -488,19 +391,10 @@ function CategoriesSection({ data }: { data: Category[] }) {
               />
             </Field>
             <Field label="Slug">
-              <Input
-                name="slug"
-                value={form.slug}
-                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              />
+              <Input name="slug" value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} />
             </Field>
             <Field label="Description">
-              <Textarea
-                name="description"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                rows={3}
-              />
+              <Textarea name="description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={3} />
             </Field>
             <Field label="Package Price ($)">
               <Input
@@ -508,25 +402,14 @@ function CategoriesSection({ data }: { data: Category[] }) {
                 type="number"
                 min={0}
                 value={Math.round(Number(form.priceCents) / 100) || 0}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, priceCents: String(Math.round(Number(e.target.value) * 100)) }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, priceCents: String(Math.round(Number(e.target.value) * 100)) }))}
               />
             </Field>
             <Field label="Sort Order">
-              <Input
-                name="sortOrder"
-                type="number"
-                value={form.sortOrder}
-                onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))}
-              />
+              <Input name="sortOrder" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
             </Field>
             <div className="flex items-center gap-3">
-              <Switch
-                name="isActive"
-                checked={form.isActive}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
-              />
+              <Switch name="isActive" checked={form.isActive} onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))} />
               <input type="hidden" name="isActive" value={String(form.isActive)} />
               <Label className="font-sans">Active</Label>
             </div>
@@ -561,13 +444,13 @@ function ProductsSection({ data, cats }: { data: Product[]; cats: Category[] }) 
       setForm(
         item
           ? {
-              name: item.name,
-              categoryId: item.categoryId,
-              description: item.description ?? "",
-              imageUrl: (item.images as { url: string }[])?.[0]?.url ?? "",
-              sortOrder: String(item.sortOrder),
-              isActive: item.isActive,
-            }
+            name: item.name,
+            categoryId: item.categoryId,
+            description: item.description ?? "",
+            imageUrl: (item.images as { url: string }[])?.[0]?.url ?? "",
+            sortOrder: String(item.sortOrder),
+            isActive: item.isActive,
+          }
           : { name: "", categoryId: cats[0]?.id ?? "", description: "", imageUrl: "", sortOrder: "0", isActive: true }
       );
     }
@@ -655,167 +538,9 @@ function ProductsSection({ data, cats }: { data: Product[]; cats: Category[] }) 
   );
 }
 
-// ─── Sound Categories section ──────────────────────────────────────────────────
-
-function SoundCategoriesSection({ data }: { data: SoundCategory[] }) {
-  const fetcher = useFetcher();
-  const [sheet, setSheet] = useState<{ item: SoundCategory | null }>({ item: null });
-  const [open, setOpen] = useState(false);
-  const isAdd = sheet.item === null;
-  const item = sheet.item;
-
-  const [form, setForm] = useState({ name: "", slug: "", sortOrder: "0", isActive: true });
-
-  useEffect(() => {
-    if (open) {
-      setForm(item
-        ? { name: item.name, slug: item.slug, sortOrder: String(item.sortOrder), isActive: item.isActive }
-        : { name: "", slug: "", sortOrder: "0", isActive: true }
-      );
-    }
-  }, [open, item?.id]);
-
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data) setOpen(false);
-  }, [fetcher.state, fetcher.data]);
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-xl font-semibold text-gray-900">Sound Categories</h2>
-        <Button size="sm" onClick={() => { setSheet({ item: null }); setOpen(true); }} className="gap-1.5">
-          <Plus className="w-4 h-4" /> Add
-        </Button>
-      </div>
-
-      <div className="rounded-2xl border border-gray-100 overflow-hidden">
-        {data.length === 0 && (
-          <div className="px-4 py-8 text-center text-gray-400 font-sans text-sm">No sound categories yet.</div>
-        )}
-        {data.map((sc) => (
-          <Row key={sc.id}>
-            <ActiveBadge isActive={sc.isActive} />
-            <span className="flex-1 font-sans font-semibold text-gray-900 text-sm">{sc.name}</span>
-            <span className="text-xs text-gray-400 font-mono hidden sm:block">{sc.slug}</span>
-            <span className="text-xs text-gray-400 font-sans">#{sc.sortOrder}</span>
-            <button onClick={() => { setSheet({ item: sc }); setOpen(true); }} className="p-1.5 rounded-lg hover:bg-brand-blue/10 text-gray-400 hover:text-brand-blue transition-colors">
-              <Pencil className="w-4 h-4" />
-            </button>
-            <DeleteButton intent="delete-sound-category" id={sc.id} />
-          </Row>
-        ))}
-      </div>
-
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent>
-          <SheetHeader><SheetTitle>{isAdd ? "Add Sound Category" : "Edit Sound Category"}</SheetTitle></SheetHeader>
-          <fetcher.Form method="post" className="flex flex-col gap-4 px-4 py-2">
-            <input type="hidden" name="intent" value={isAdd ? "create-sound-category" : "update-sound-category"} />
-            {!isAdd && <input type="hidden" name="id" value={item!.id} />}
-            <Field label="Name">
-              <Input name="name" value={form.name} onChange={(e) => {
-                const name = e.target.value;
-                setForm((f) => ({ ...f, name, slug: isAdd ? slugify(name) : f.slug }));
-              }} required />
-            </Field>
-            <Field label="Slug">
-              <Input name="slug" value={form.slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))} />
-            </Field>
-            <Field label="Sort Order">
-              <Input name="sortOrder" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
-            </Field>
-            <div className="flex items-center gap-3">
-              <Switch checked={form.isActive} onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))} />
-              <input type="hidden" name="isActive" value={String(form.isActive)} />
-              <Label className="font-sans">Active</Label>
-            </div>
-            <SheetFooter>
-              <Button type="submit" disabled={fetcher.state !== "idle"} className="w-full">
-                {fetcher.state !== "idle" ? "Saving…" : isAdd ? "Create" : "Save Changes"}
-              </Button>
-            </SheetFooter>
-          </fetcher.Form>
-        </SheetContent>
-      </Sheet>
-    </div>
-  );
-}
-
-// ─── Tags section ──────────────────────────────────────────────────────────────
-
-function TagsSection({ data }: { data: SoundTag[] }) {
-  const fetcher = useFetcher();
-  const [sheet, setSheet] = useState<{ item: SoundTag | null }>({ item: null });
-  const [open, setOpen] = useState(false);
-  const isAdd = sheet.item === null;
-  const item = sheet.item;
-  const [name, setName] = useState("");
-
-  useEffect(() => {
-    if (open) setName(item?.name ?? "");
-  }, [open, item?.id]);
-
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data) setOpen(false);
-  }, [fetcher.state, fetcher.data]);
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-xl font-semibold text-gray-900">Sound Tags</h2>
-        <Button size="sm" onClick={() => { setSheet({ item: null }); setOpen(true); }} className="gap-1.5">
-          <Plus className="w-4 h-4" /> Add
-        </Button>
-      </div>
-
-      <div className="rounded-2xl border border-gray-100 overflow-hidden">
-        {data.length === 0 && (
-          <div className="px-4 py-8 text-center text-gray-400 font-sans text-sm">No tags yet.</div>
-        )}
-        {data.map((tag) => (
-          <Row key={tag.id}>
-            <span className="flex-1 font-sans font-semibold text-gray-900 text-sm">{tag.name}</span>
-            <span className="text-xs text-gray-400 font-mono hidden sm:block">{tag.slug}</span>
-            <button onClick={() => { setSheet({ item: tag }); setOpen(true); }} className="p-1.5 rounded-lg hover:bg-brand-blue/10 text-gray-400 hover:text-brand-blue transition-colors">
-              <Pencil className="w-4 h-4" />
-            </button>
-            <DeleteButton intent="delete-sound-tag" id={tag.id} />
-          </Row>
-        ))}
-      </div>
-
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent>
-          <SheetHeader><SheetTitle>{isAdd ? "Add Tag" : "Edit Tag"}</SheetTitle></SheetHeader>
-          <fetcher.Form method="post" className="flex flex-col gap-4 px-4 py-2">
-            <input type="hidden" name="intent" value={isAdd ? "create-sound-tag" : "update-sound-tag"} />
-            {!isAdd && <input type="hidden" name="id" value={item!.id} />}
-            <Field label="Tag Name">
-              <Input name="name" value={name} onChange={(e) => setName(e.target.value)} required />
-            </Field>
-            <SheetFooter>
-              <Button type="submit" disabled={fetcher.state !== "idle"} className="w-full">
-                {fetcher.state !== "idle" ? "Saving…" : isAdd ? "Create" : "Save Changes"}
-              </Button>
-            </SheetFooter>
-          </fetcher.Form>
-        </SheetContent>
-      </Sheet>
-    </div>
-  );
-}
-
 // ─── Sounds section ────────────────────────────────────────────────────────────
 
-function SoundsSection({
-  data,
-  soundCats,
-  tags,
-}: {
-  data: Sound[];
-  soundCats: SoundCategory[];
-  tags: SoundTag[];
-}) {
+function SoundsSection({ data }: { data: Sound[] }) {
   const fetcher = useFetcher();
   const [sheet, setSheet] = useState<{ item: Sound | null }>({ item: null });
   const [open, setOpen] = useState(false);
@@ -824,30 +549,26 @@ function SoundsSection({
 
   const [form, setForm] = useState({
     title: "", artist: "", durationSeconds: "0", previewDurationSeconds: "",
-    thumbnailUrl: "", audioUrl: "", categoryId: "", sortOrder: "0", isActive: true,
-    tagIds: [] as string[],
+    thumbnailUrl: "", audioUrl: "", sortOrder: "0", isActive: true,
   });
 
   useEffect(() => {
     if (open) {
       setForm(item
         ? {
-            title: item.title,
-            artist: item.artist,
-            durationSeconds: String(item.durationSeconds),
-            previewDurationSeconds: item.previewDurationSeconds != null ? String(item.previewDurationSeconds) : "",
-            thumbnailUrl: item.thumbnailUrl ?? "",
-            audioUrl: item.audioUrl ?? "",
-            categoryId: item.categoryId ?? "",
-            sortOrder: String(item.sortOrder),
-            isActive: item.isActive,
-            tagIds: item.tagAssignments.map((a) => a.tagId),
-          }
+          title: item.title,
+          artist: item.artist,
+          durationSeconds: String(item.durationSeconds),
+          previewDurationSeconds: item.previewDurationSeconds != null ? String(item.previewDurationSeconds) : "",
+          thumbnailUrl: item.thumbnailUrl ?? "",
+          audioUrl: item.audioUrl ?? "",
+          sortOrder: String(item.sortOrder),
+          isActive: item.isActive,
+        }
         : {
-            title: "", artist: "", durationSeconds: "0", previewDurationSeconds: "",
-            thumbnailUrl: "", audioUrl: "", categoryId: soundCats[0]?.id ?? "",
-            sortOrder: "0", isActive: true, tagIds: [],
-          }
+          title: "", artist: "", durationSeconds: "0", previewDurationSeconds: "",
+          thumbnailUrl: "", audioUrl: "", sortOrder: "0", isActive: true,
+        }
       );
     }
   }, [open, item?.id]);
@@ -855,12 +576,6 @@ function SoundsSection({
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data) setOpen(false);
   }, [fetcher.state, fetcher.data]);
-
-  const toggleTag = (id: string) =>
-    setForm((f) => ({
-      ...f,
-      tagIds: f.tagIds.includes(id) ? f.tagIds.filter((t) => t !== id) : [...f.tagIds, id],
-    }));
 
   return (
     <div>
@@ -880,19 +595,7 @@ function SoundsSection({
             <ActiveBadge isActive={s.isActive} />
             <span className="flex-1 font-sans font-semibold text-gray-900 text-sm">{s.title}</span>
             <span className="text-xs text-gray-500 font-sans hidden sm:block">{s.artist}</span>
-            {s.category && (
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-sans hidden md:block">
-                {s.category.name}
-              </span>
-            )}
             <span className="text-xs text-gray-400 font-sans">{s.durationSeconds}s</span>
-            <div className="flex gap-1">
-              {s.tagAssignments.map((a) => (
-                <span key={a.tagId} className="text-xs bg-brand-blue/10 text-brand-blue px-1.5 py-0.5 rounded font-sans">
-                  {a.tag.name}
-                </span>
-              ))}
-            </div>
             <button onClick={() => { setSheet({ item: s }); setOpen(true); }} className="p-1.5 rounded-lg hover:bg-brand-blue/10 text-gray-400 hover:text-brand-blue transition-colors">
               <Pencil className="w-4 h-4" />
             </button>
@@ -907,7 +610,6 @@ function SoundsSection({
           <fetcher.Form method="post" className="flex flex-col gap-4 px-4 py-2">
             <input type="hidden" name="intent" value={isAdd ? "create-sound" : "update-sound"} />
             {!isAdd && <input type="hidden" name="id" value={item!.id} />}
-            <input type="hidden" name="tagIds" value={form.tagIds.join(",")} />
             <Field label="Title">
               <Input name="title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} required />
             </Field>
@@ -928,40 +630,9 @@ function SoundsSection({
             <Field label="Audio URL">
               <Input name="audioUrl" value={form.audioUrl} onChange={(e) => setForm((f) => ({ ...f, audioUrl: e.target.value }))} placeholder="https://…" />
             </Field>
-            <Field label="Sound Category">
-              <Select value={form.categoryId} onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v }))}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {soundCats.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <input type="hidden" name="categoryId" value={form.categoryId} />
+            <Field label="Sort Order">
+              <Input name="sortOrder" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
             </Field>
-            <Field label="Tags">
-              <div className="flex flex-wrap gap-2">
-                {tags.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => toggleTag(t.id)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-all font-sans font-semibold ${
-                      form.tagIds.includes(t.id)
-                        ? "bg-brand-blue text-white border-brand-blue"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-brand-blue"
-                    }`}
-                  >
-                    {t.name}
-                  </button>
-                ))}
-                {tags.length === 0 && <span className="text-xs text-gray-400 font-sans">No tags — add some in the Tags section first.</span>}
-              </div>
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Sort Order">
-                <Input name="sortOrder" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
-              </Field>
-            </div>
             <div className="flex items-center gap-3">
               <Switch checked={form.isActive} onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))} />
               <input type="hidden" name="isActive" value={String(form.isActive)} />
@@ -1048,11 +719,10 @@ function OrderRow({ order }: { order: Order }) {
                 <button
                   type="submit"
                   disabled={order.status === s || fetcher.state !== "idle"}
-                  className={`text-xs px-3 py-1 rounded-full font-bold font-sans transition-all ${
-                    order.status === s
-                      ? `${STATUS_COLORS[s]} opacity-100 cursor-default`
-                      : "bg-white border border-gray-200 text-gray-600 hover:border-brand-blue hover:text-brand-blue"
-                  }`}
+                  className={`text-xs px-3 py-1 rounded-full font-bold font-sans transition-all ${order.status === s
+                    ? `${STATUS_COLORS[s]} opacity-100 cursor-default`
+                    : "bg-white border border-gray-200 text-gray-600 hover:border-brand-blue hover:text-brand-blue"
+                    }`}
                 >
                   {s}
                 </button>
@@ -1068,7 +738,7 @@ function OrderRow({ order }: { order: Order }) {
 function OrdersSection({ data }: { data: Order[] }) {
   return (
     <div>
-      <h2 className="font-display text-xl font-semibold text-gray-900 mb-4">Orders</h2>
+      <h2 className="font-display text-xl font-semibold text-gray-900 mb-4">Orders Review</h2>
       <div className="rounded-2xl border border-gray-100 overflow-hidden">
         {data.length === 0 && (
           <div className="px-4 py-8 text-center text-gray-400 font-sans text-sm">No orders yet.</div>
@@ -1082,19 +752,16 @@ function OrdersSection({ data }: { data: Order[] }) {
 // ─── Sidebar nav ───────────────────────────────────────────────────────────────
 
 const NAV: { section: Section; label: string; icon: React.ReactNode }[] = [
-  { section: "orders", label: "Orders", icon: <ClipboardList className="w-4 h-4" /> },
-  { section: "categories", label: "Categories", icon: <LayoutGrid className="w-4 h-4" /> },
-  { section: "products", label: "Products", icon: <Package className="w-4 h-4" /> },
-  { section: "sounds", label: "Sounds", icon: <Music className="w-4 h-4" /> },
-  { section: "sound-categories", label: "Sound Categories", icon: <Layers className="w-4 h-4" /> },
-  { section: "tags", label: "Sound Tags", icon: <Tag className="w-4 h-4" /> },
+  { section: "orders", label: "Orders Review", icon: <ClipboardList className="w-4 h-4" /> },
+  // { section: "categories", label: "Categories", icon: <LayoutGrid className="w-4 h-4" /> },
+  // { section: "products", label: "Products", icon: <Package className="w-4 h-4" /> },
+  // { section: "sounds", label: "Sounds", icon: <Music className="w-4 h-4" /> },
 ];
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
-  const { allCategories, allProducts, allSoundCategories, allSounds, allTags, allOrders } =
-    useLoaderData<typeof loader>();
+  const { allCategories, allProducts, allSounds, allOrders } = useLoaderData<typeof loader>();
 
   const [section, setSection] = useState<Section>("orders");
 
@@ -1110,11 +777,10 @@ export default function AdminPage() {
             <button
               key={s}
               onClick={() => setSection(s)}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-sans font-semibold transition-all text-left ${
-                section === s
-                  ? "bg-brand-blue text-white"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-sans font-semibold transition-all text-left ${section === s
+                ? "bg-brand-blue text-white"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
             >
               {icon}
               {label}
@@ -1128,11 +794,7 @@ export default function AdminPage() {
         {section === "orders" && <OrdersSection data={allOrders} />}
         {section === "categories" && <CategoriesSection data={allCategories} />}
         {section === "products" && <ProductsSection data={allProducts} cats={allCategories} />}
-        {section === "sounds" && (
-          <SoundsSection data={allSounds} soundCats={allSoundCategories} tags={allTags} />
-        )}
-        {section === "sound-categories" && <SoundCategoriesSection data={allSoundCategories} />}
-        {section === "tags" && <TagsSection data={allTags} />}
+        {section === "sounds" && <SoundsSection data={allSounds} />}
       </main>
     </div>
   );

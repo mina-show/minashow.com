@@ -42,6 +42,11 @@
   --brand-green: #a9d937;
   --brand-orange: #fdb761;
 
+  /* Brand tints (icon backgrounds, light fills) */
+  --brand-green-light: #e8f5bc;
+  --brand-green-tint: #f2fae3;
+  --brand-red-light: #f9eaec;
+
   /* Charts */
   --chart-1: #202973;
   --chart-2: #aa1324;
@@ -108,6 +113,9 @@
   --color-brand-yellow: var(--brand-yellow);
   --color-brand-green: var(--brand-green);
   --color-brand-orange: var(--brand-orange);
+  --color-brand-green-light: var(--brand-green-light);
+  --color-brand-green-tint: var(--brand-green-tint);
+  --color-brand-red-light: var(--brand-red-light);
 
   /* Shadcn standard mappings */
   --color-background: var(--background);
@@ -160,5 +168,21 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer utilities {
+  /** Repeating dot overlay used in hero/banner sections */
+  .bg-dot-sm {
+    background-image: radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .bg-dot-lg {
+    background-image: radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  /** Multi-colour brand gradient used as decorative accent */
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, #aa1324, #fbf204, #a9d937, #202973);
   }
 }

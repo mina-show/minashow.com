@@ -7,19 +7,19 @@ export function meta() {
 
 const steps = [
   {
-    icon: <CheckCircle className="w-5 h-5 shrink-0" style={{ color: "#a9d937" }} />,
+    icon: <CheckCircle className="w-5 h-5 shrink-0 text-brand-green" />,
     title: "Order received",
     desc: "We have your order details.",
     done: true,
   },
   {
-    icon: <Clock className="w-5 h-5 shrink-0" style={{ color: "#fbf204" }} />,
+    icon: <Clock className="w-5 h-5 shrink-0 text-brand-yellow" />,
     title: "Zeffy payment link on the way",
     desc: "An admin will send you a donation payment link within 1–2 business days.",
     done: false,
   },
   {
-    icon: <ShoppingBag className="w-5 h-5 shrink-0" style={{ color: "#202973" }} />,
+    icon: <ShoppingBag className="w-5 h-5 shrink-0 text-brand-blue" />,
     title: "Invoice & fulfillment",
     desc: "After payment, we generate your PDF donation receipt and prepare your order.",
     done: false,
@@ -31,28 +31,15 @@ export default function ConfirmationPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="max-w-lg w-full">
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 sm:p-10 text-center">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ backgroundColor: "#e8f5bc" }}
-          >
-            <CheckCircle className="w-10 h-10" style={{ color: "#a9d937" }} />
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 bg-brand-green-light">
+            <CheckCircle className="w-10 h-10 text-brand-green" />
           </div>
 
-          <h1
-            className="text-gray-900 mb-3"
-            style={{
-              fontFamily: "Fredoka, sans-serif",
-              fontSize: "2rem",
-              fontWeight: 700,
-            }}
-          >
+          <h1 className="text-gray-900 mb-3 font-display text-[2rem] font-bold">
             Order placed!
           </h1>
 
-          <p
-            className="text-gray-600 mb-8 leading-relaxed font-sans"
-            style={{ lineHeight: 1.7 }}
-          >
+          <p className="text-gray-600 mb-8 leading-[1.7] font-sans">
             Thank you for your order. Our team will review it and send you a Zeffy donation
             payment link via email within 1–2 business days. A PDF donation receipt will be
             issued for your tax records.
@@ -80,8 +67,7 @@ export default function ConfirmationPage() {
             </Link>
             <Link
               to="/shop"
-              className="flex-1 py-3 rounded-full text-white transition-colors text-center hover:opacity-90 font-sans font-extrabold"
-              style={{ backgroundColor: "#202973" }}
+              className="flex-1 py-3 rounded-full bg-brand-blue text-white transition-colors text-center hover:opacity-90 font-sans font-extrabold"
             >
               Back to shop
             </Link>

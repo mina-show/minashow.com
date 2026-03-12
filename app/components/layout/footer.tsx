@@ -11,6 +11,12 @@ const supportLinks = [
   { label: "Sounds", to: "/sounds" },
 ] as const;
 
+const socialLinks = [
+  { Icon: Facebook, bgClass: "bg-brand-blue", label: "Facebook" },
+  { Icon: Instagram, bgClass: "bg-brand-red", label: "Instagram" },
+  { Icon: Youtube, bgClass: "bg-brand-green", label: "YouTube" },
+] as const;
+
 export function Footer() {
   return (
     <footer className="bg-gray-900 text-gray-400 mt-auto">
@@ -18,11 +24,9 @@ export function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
           {/* Brand */}
           <div className="lg:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4" style={{ fontFamily: "Fredoka, sans-serif" }}>
+            <Link to="/" className="flex items-center gap-2 mb-4 font-display">
               <LogoMark size={32} />
-              <span className="text-white" style={{ fontSize: "1.25rem", fontWeight: 700 }}>
-                minashow
-              </span>
+              <span className="text-white text-xl font-bold">minashow</span>
             </Link>
             <p className="text-sm leading-relaxed font-sans">
               A non-profit store serving Arabic-speaking churches with everything they need for a
@@ -72,17 +76,12 @@ export function Footer() {
               hello@minashow.com
             </a>
             <div className="flex gap-3">
-              {[
-                { Icon: Facebook, color: "#202973", label: "Facebook" },
-                { Icon: Instagram, color: "#aa1324", label: "Instagram" },
-                { Icon: Youtube, color: "#a9d937", label: "YouTube" },
-              ].map(({ Icon, color, label }) => (
+              {socialLinks.map(({ Icon, bgClass, label }) => (
                 <a
                   key={label}
                   href="#"
                   aria-label={label}
-                  className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
-                  style={{ backgroundColor: color }}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-80 ${bgClass}`}
                 >
                   <Icon className="w-4 h-4 text-white" />
                 </a>

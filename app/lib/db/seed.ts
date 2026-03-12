@@ -12,7 +12,6 @@ import {
   users,
   userCredentials,
   categories,
-  soundCategories,
 } from "./schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -67,13 +66,6 @@ const PRODUCT_CATEGORIES = [
   },
 ] as const;
 
-// ─── Sound categories ──────────────────────────────────────────────────────
-const SOUND_CATEGORIES = [
-  { name: "Praise", slug: "praise", sortOrder: 1 },
-  { name: "Story Songs", slug: "story-songs", sortOrder: 2 },
-  { name: "Seasonal", slug: "seasonal", sortOrder: 3 },
-] as const;
-
 // ─── Seed ─────────────────────────────────────────────────────────────────
 async function seed() {
   console.log("🌱 Seeding database...\n");
@@ -111,19 +103,6 @@ async function seed() {
     } else {
       await db.insert(categories).values(cat);
       console.log(`✅ Created category: ${cat.name}`);
-    }
-  }
-
-  // ── Sound categories ─────────────────────────────────────────────────────
-  for (const sc of SOUND_CATEGORIES) {
-    const existing = await db.query.soundCategories.findFirst({
-      where: eq(soundCategories.slug, sc.slug),
-    });
-    if (existing) {
-      console.log(`⚠️  Sound category already exists: ${sc.name}`);
-    } else {
-      await db.insert(soundCategories).values(sc);
-      console.log(`✅ Created sound category: ${sc.name}`);
     }
   }
 

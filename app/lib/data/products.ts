@@ -13,14 +13,14 @@ export interface Category {
   name: string;
   description: string;
   image: string;
-  /** Tailwind bg utility class */
+  /** Tailwind bg utility class (light tint) */
   bgClass: string;
   /** Tailwind text utility class */
   textClass: string;
   /** Tailwind border utility class */
   borderClass: string;
-  /** Brand hex color (for dynamic inline styles) */
-  color: string;
+  /** Tailwind bg class for the active/selected state (full brand color) */
+  activeClass: string;
 }
 
 export const categories: Category[] = [
@@ -32,7 +32,7 @@ export const categories: Category[] = [
     bgClass: "bg-blue-50",
     textClass: "text-blue-600",
     borderClass: "border-blue-200",
-    color: "#202973",
+    activeClass: "bg-brand-blue",
   },
   {
     id: "costumes",
@@ -42,7 +42,7 @@ export const categories: Category[] = [
     bgClass: "bg-red-50",
     textClass: "text-red-500",
     borderClass: "border-red-200",
-    color: "#aa1324",
+    activeClass: "bg-brand-red",
   },
   {
     id: "soundtracks",
@@ -52,7 +52,7 @@ export const categories: Category[] = [
     bgClass: "bg-yellow-50",
     textClass: "text-yellow-600",
     borderClass: "border-yellow-200",
-    color: "#fbf204",
+    activeClass: "bg-brand-yellow",
   },
   {
     id: "marionettes",
@@ -62,7 +62,7 @@ export const categories: Category[] = [
     bgClass: "bg-green-50",
     textClass: "text-green-600",
     borderClass: "border-green-200",
-    color: "#a9d937",
+    activeClass: "bg-brand-green",
   },
 ];
 
