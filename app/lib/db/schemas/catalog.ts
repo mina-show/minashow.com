@@ -9,7 +9,7 @@ import { relations } from "drizzle-orm";
  * Categories — each category is a purchasable package.
  * The 6 stakeholder-defined categories should be seeded:
  *   human-mascots | human-costumes | animal-costumes |
- *   animal-mascots | soundtracks | marionettes
+ *   animal-mascots | soundtracks
  */
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().defaultRandom(),

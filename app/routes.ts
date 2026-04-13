@@ -15,6 +15,7 @@ export default [
     route("shop", "routes/_layout.shop.tsx"),
     route("shop/:category", "routes/_layout.shop.$category.tsx"),
     route("product/:id", "routes/_layout.product.$id.tsx"),
+    route("package/:id", "routes/_layout.package.$id.tsx"),
     route("cart", "routes/_layout.cart.tsx"),
     route("checkout", "routes/_layout.checkout.tsx"),
     route("confirmation", "routes/_layout.confirmation.tsx"),

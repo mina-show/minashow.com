@@ -53,16 +53,9 @@ const PRODUCT_CATEGORIES = [
   {
     name: "Soundtracks",
     slug: "soundtracks",
-    description: "Original Arabic kids' praise and show music.",
+    description: "Original show music for kids' performances.",
     priceCents: 0,
     sortOrder: 5,
-  },
-  {
-    name: "Marionettes",
-    slug: "marionettes",
-    description: "Handcrafted marionette puppets for storytelling performances.",
-    priceCents: 0,
-    sortOrder: 6,
   },
 ] as const;
 

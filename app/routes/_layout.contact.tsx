@@ -96,7 +96,7 @@ export default function ContactPage() {
             </h1>
           </div>
           <p className="max-w-xl font-sans" style={{ lineHeight: 1.7, color: "#ffffff" }}>
-            Have a question about an order, a product, or the ministry? We'd love to hear from you.
+            Have a question about an order, a product, or our team? We'd love to hear from you.
           </p>
         </div>
       </section>

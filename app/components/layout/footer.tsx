@@ -2,13 +2,11 @@ import { Link } from "react-router";
 import { Mail, Instagram, Facebook, Youtube } from "lucide-react";
 import { LogoMark } from "./logo-mark";
 
-const shopLinks = ["Mascots", "Costumes", "Soundtracks", "Marionettes"] as const;
+const shopLinks = ["Mascots", "Costumes", "Soundtracks"] as const;
 
 const supportLinks = [
   { label: "Contact Us", to: "/contact" },
-  { label: "Volunteer", to: "/volunteer" },
   { label: "My Orders", to: "/dashboard" },
-  { label: "Sounds", to: "/sounds" },
 ] as const;
 
 const socialLinks = [
@@ -29,7 +27,7 @@ export function Footer() {
               <span className="text-white text-xl font-bold">minashow</span>
             </Link>
             <p className="text-sm leading-relaxed font-sans">
-              A non-profit store serving Arabic-speaking churches with everything they need for a
+              A non-profit store serving communities everywhere with everything they need for a
               great kids' show.
             </p>
           </div>

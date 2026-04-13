@@ -19,6 +19,7 @@ export const routePaths = [
   "/home",
   "/login",
   "/logout",
+  "/package/:id",
   "/product/:id",
   "/profile",
   "/shop",
@@ -28,6 +29,7 @@ export type Path = (typeof routePaths)[number];
 
 // all params for any given path get defined here...
 export type Params = {
+  "/package/:id": { id: string };
   "/product/:id": { id: string };
   "/shop/:category": { category: string };
 };

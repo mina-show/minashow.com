@@ -14,7 +14,7 @@ export function meta() {
 
 interface CheckoutForm {
   name: string;
-  church: string;
+  organization: string;
   email: string;
   phone: string;
   notes: string;
@@ -27,7 +27,7 @@ export default function CheckoutPage() {
 
   const [form, setForm] = useState<CheckoutForm>({
     name: user?.name ?? "",
-    church: "",
+    organization: "",
     email: user?.email ?? "",
     phone: "",
     notes: "",
@@ -43,7 +43,7 @@ export default function CheckoutPage() {
   const validate = (): Partial<CheckoutForm> => {
     const e: Partial<CheckoutForm> = {};
     if (!form.name.trim()) e.name = "Name is required";
-    if (!form.church.trim()) e.church = "Church name is required";
+    if (!form.organization.trim()) e.organization = "Organization name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Invalid email";
     if (!form.phone.trim()) e.phone = "Phone is required";
@@ -116,26 +116,26 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
-                {/* Church */}
+                {/* Organization */}
                 <div className="sm:col-span-2">
                   <Label
-                    htmlFor="church"
+                    htmlFor="organization"
                     className="font-sans font-bold text-gray-700 mb-1.5 block"
                   >
-                    Church name
+                    Organization name
                   </Label>
                   <Input
-                    id="church"
+                    id="organization"
                     type="text"
-                    value={form.church}
-                    onChange={(e) => handleChange("church", e.target.value)}
-                    placeholder="e.g. St. Mark Church — Cairo"
+                    value={form.organization}
+                    onChange={(e) => handleChange("organization", e.target.value)}
+                    placeholder="e.g. Sunrise Community Center"
                     className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${
-                      errors.church ? "border-red-300" : ""
+                      errors.organization ? "border-red-300" : ""
                     }`}
                   />
-                  {errors.church && (
-                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.church}</p>
+                  {errors.organization && (
+                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.organization}</p>
                   )}
                 </div>
 
@@ -152,7 +152,7 @@ export default function CheckoutPage() {
                     type="email"
                     value={form.email}
                     onChange={(e) => handleChange("email", e.target.value)}
-                    placeholder="you@church.org"
+                    placeholder="you@organization.org"
                     className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${
                       errors.email ? "border-red-300" : ""
                     }`}
@@ -175,7 +175,7 @@ export default function CheckoutPage() {
                     type="tel"
                     value={form.phone}
                     onChange={(e) => handleChange("phone", e.target.value)}
-                    placeholder="+20 100 000 0000"
+                    placeholder="+1 555 000 0000"
                     className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${
                       errors.phone ? "border-red-300" : ""
                     }`}

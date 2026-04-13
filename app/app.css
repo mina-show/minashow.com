@@ -185,4 +185,34 @@
   .bg-brand-gradient {
     background: linear-gradient(135deg, #aa1324, #fbf204, #a9d937, #202973);
   }
+
+  /** Floating animation for decorative blobs / badges */
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+  .animate-float-slow {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-float-delayed {
+    animation: float 4s ease-in-out 1.5s infinite;
+  }
+
+  /** Spin slowly for decorative star elements */
+  .animate-spin-slow {
+    animation: spin 12s linear infinite;
+  }
+
+  /** Card hover lift — apply to the element, not a parent */
+  .card-lift {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
 }

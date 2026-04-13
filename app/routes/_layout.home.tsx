@@ -1,14 +1,14 @@
 import { Link } from "react-router";
-import { ArrowRight, ShoppingBag, Music } from "lucide-react";
+import { ArrowRight, ShoppingBag } from "lucide-react";
 import { categories } from "~/lib/data/products";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
 
 export function meta() {
   return [
-    { title: "Minashow — Kids Show Materials for Churches" },
+    { title: "Minashow — Kids Show Materials" },
     {
       name: "description",
-      content: "Mascots, costumes, soundtracks, and marionettes for Arabic-speaking churches.",
+      content: "Mascots, costumes, and soundtracks for communities everywhere.",
     },
   ];
 }
@@ -29,11 +29,11 @@ export default function HomePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h1 className="text-white mb-6 font-display text-[clamp(2.5rem,5vw,4rem)] font-bold leading-[1.1]">
-              Bring faith to the stage
+              Bring the show to life
             </h1>
             <p className="mb-8 max-w-md font-sans text-[1.1rem] leading-[1.7] text-blue-100">
-              Everything you need for a great kids' show — mascots, costumes, soundtracks, and
-              handcrafted marionettes. Made for churches that care about quality.
+              Everything you need for a great kids' show, from mascots, costumes, and soundtracks.
+              Made for communities everywhere that care about quality.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
@@ -42,13 +42,6 @@ export default function HomePage() {
               >
                 <ShoppingBag className="w-4 h-4" />
                 Browse the shop
-              </Link>
-              <Link
-                to="/sounds"
-                className="inline-flex items-center gap-2 border-2 border-white/40 text-white px-6 py-3 rounded-full hover:bg-white/10 transition-colors font-sans font-bold"
-              >
-                <Music className="w-4 h-4" />
-                Listen to sounds
               </Link>
             </div>
           </div>
