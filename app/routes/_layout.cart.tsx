@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "react-router";
-import { Trash2, ShoppingBag, ArrowRight } from "lucide-react";
+import { Trash2, ShoppingBag, ArrowRight, Package } from "lucide-react";
 import { useCart } from "~/components/providers/cart-provider";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
+import { getPackageById } from "~/lib/data/packages";
 
 export function meta() {
   return [{ title: "Your Cart — Minashow" }];
@@ -49,20 +50,47 @@ export default function CartPage() {
                 key={item.id}
                 className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4"
               >
-                <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100">
-                  <ImageWithFallback
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                {item.category === "package" ? (
+                  /* Package thumbnail — show item count instead of a single image */
+                  (() => {
+                    const pkg = getPackageById(item.id.replace("pkg-", ""));
+                    return (
+                      <div
+                        className="w-20 h-20 rounded-xl shrink-0 flex flex-col items-center justify-center gap-0.5"
+                        style={{ backgroundColor: pkg?.color ?? "#202973" }}
+                      >
+                        <Package className="w-5 h-5 text-white/80" />
+                        <span className="text-white font-extrabold font-sans text-sm leading-none">
+                          {pkg?.images.length ?? "—"}
+                        </span>
+                        <span className="text-white/60 font-sans text-[10px] leading-none">items</span>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+                    <ImageWithFallback
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
 
                 <div className="flex-1 min-w-0">
+                  {item.category === "package" ? (
+                    <Link to={`/package/${item.id.replace("pkg-", "")}`}>
+                      <h3 className="text-gray-900 hover:text-brand-blue transition-colors truncate font-sans font-bold">
+                        {item.name}
+                      </h3>
+                    </Link>
+                  ) : (
                   <Link to={`/product/${item.id}`}>
                     <h3 className="text-gray-900 hover:text-brand-blue transition-colors truncate font-sans font-bold">
                       {item.name}
                     </h3>
                   </Link>
+                  )}
                   <p className="text-gray-500 text-sm capitalize font-sans">{item.category}</p>
                   <p className="text-gray-900 mt-1 font-sans font-extrabold">${item.price}</p>
                 </div>
