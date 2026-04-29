@@ -15,6 +15,8 @@ export interface Package {
   color: string;
   /** Light tint used for chips / backgrounds */
   lightColor: string;
+  /** This sets whether or not the package can be added and is showing */
+  isDisabled: boolean;
 }
 
 const humanMascotImages: PackageImage[] = [
@@ -61,6 +63,7 @@ export const packages: Package[] = [
     images: humanMascotImages,
     color: "#aa1324",
     lightColor: "#fcedf0",
+    isDisabled: false,
   },
   {
     id: "human-costumes",
@@ -70,15 +73,17 @@ export const packages: Package[] = [
     images: humanCostumeImages,
     color: "#6a9e0f",
     lightColor: "#f0f8e0",
+    isDisabled: false,
   },
   {
     id: "animal-bundle",
     name: "Animal Bundle",
     subtitle: "The complete collection",
     description: "Full-body animal mascots and costumes to bring your show characters to life on stage.",
-    images: [...humanMascotImages, ...humanCostumeImages],
+    images: [],
     color: "#202973",
     lightColor: "#eef0f8",
+    isDisabled: true,
   },
 ];
 

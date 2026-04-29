@@ -67,11 +67,11 @@ export function Footer() {
           <div>
             <h4 className="text-white mb-4 text-sm font-sans font-bold">Get in Touch</h4>
             <a
-              href="mailto:hello@minashow.com"
+              href="mailto:info@minashow.com"
               className="flex items-center gap-2 text-sm hover:text-white transition-colors mb-4 font-sans"
             >
               <Mail className="w-4 h-4" />
-              hello@minashow.com
+              info@minashow.com
             </a>
             <div className="flex gap-3">
               {socialLinks.map(({ Icon, bgClass, label }) => (

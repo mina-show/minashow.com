@@ -113,18 +113,15 @@ export function ShopPage({ initialCategory = "all" }: { initialCategory?: string
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {packages.map((pkg) => {
               const previewImages = pkg.images.slice(0, 4);
+              const className = `group relative rounded-3xl overflow-hidden flex flex-col ${pkg.isDisabled ? "cursor-not-allowed grayscale opacity-50" : "card-lift"}`;
+              const style = {
+                backgroundColor: pkg.color,
+                boxShadow: pkg.isDisabled ? "none" : `0 4px 24px ${pkg.color}45`,
+                minHeight: "360px",
+              };
 
-              return (
-                <Link
-                  key={pkg.id}
-                  to={`/package/${pkg.id}`}
-                  className="group relative rounded-3xl overflow-hidden card-lift flex flex-col"
-                  style={{
-                    backgroundColor: pkg.color,
-                    boxShadow: `0 4px 24px ${pkg.color}45`,
-                    minHeight: "360px",
-                  }}
-                >
+              const cardContent = (
+                <>
                   {/* Top dot pattern */}
                   <div className="absolute inset-0 bg-dot-sm opacity-[0.08]" />
 
@@ -200,6 +197,16 @@ export function ShopPage({ initialCategory = "all" }: { initialCategory?: string
                       <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
+                </>
+              );
+
+              return pkg.isDisabled ? (
+                <div key={pkg.id} className={className} style={style}>
+                  {cardContent}
+                </div>
+              ) : (
+                <Link key={pkg.id} to={`/package/${pkg.id}`} className={className} style={style}>
+                  {cardContent}
                 </Link>
               );
             })}
@@ -223,9 +230,6 @@ export function ShopPage({ initialCategory = "all" }: { initialCategory?: string
                 >
                   Soundtracks
                 </h2>
-                <p className="text-gray-500 text-sm font-sans mt-0.5">
-                  Arabic praise &amp; show music
-                </p>
               </div>
             </div>
 

@@ -185,10 +185,10 @@ export default function ContactPage() {
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <p className="text-gray-500 text-sm mb-1 font-sans">Email us directly</p>
             <a
-              href="mailto:hello@minashow.com"
+              href="mailto:info@minashow.com"
               className="font-semibold transition-colors hover:opacity-80 font-sans text-brand-orange"
             >
-              hello@minashow.com
+              info@minashow.com
             </a>
           </div>
         </div>
