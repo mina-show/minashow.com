@@ -1,18 +1,56 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { FileText, Download, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Link, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
+import { Package, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "~/components/providers/auth-provider";
-import { mockOrders, statusColors, type Order } from "~/lib/data/orders";
+import { getSessionUser } from "~/lib/auth/session.server";
+import { db } from "~/lib/db/client";
+import { orders } from "~/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export function meta() {
   return [{ title: "My Orders — Minashow" }];
 }
 
-type TabKey = "all" | "Pending" | "Paid" | "Fulfilled";
+// ─── Status styling ──────────────────────────────────────────────────────────
 
-function OrderCard({ order }: { order: Order }) {
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800",
+  confirmed: "bg-blue-100 text-blue-800",
+  processing: "bg-indigo-100 text-indigo-800",
+  shipped: "bg-purple-100 text-purple-800",
+  delivered: "bg-green-100 text-green-800",
+  cancelled: "bg-gray-100 text-gray-600",
+  refunded: "bg-red-100 text-red-700",
+};
+
+// ─── Loader ──────────────────────────────────────────────────────────────────
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const user = await getSessionUser(request);
+  if (!user) return { userOrders: [] };
+
+  const userOrders = await db.query.orders.findMany({
+    where: eq(orders.userId, user.id),
+    with: { items: true },
+    orderBy: [desc(orders.createdAt)],
+  });
+
+  return { userOrders };
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type LoaderData = Awaited<ReturnType<typeof loader>>;
+type DBOrder = LoaderData["userOrders"][number];
+
+type TabKey = "all" | "pending" | "confirmed" | "processing" | "delivered";
+
+// ─── Order card ──────────────────────────────────────────────────────────────
+
+function OrderCard({ order }: { order: DBOrder }) {
   const [expanded, setExpanded] = useState(false);
-  const statusCls = statusColors[order.status];
+  const statusCls = STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-600";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -24,13 +62,15 @@ function OrderCard({ order }: { order: Order }) {
       >
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-gray-900 font-sans font-bold">{order.id}</span>
+            <span className="text-gray-900 font-sans font-bold font-mono text-sm">
+              {order.id.slice(0, 8)}…
+            </span>
             <span className={`text-xs px-2.5 py-0.5 rounded-full ${statusCls} font-sans font-bold`}>
               {order.status}
             </span>
           </div>
           <p className="text-gray-500 text-sm font-sans">
-            {new Date(order.date).toLocaleDateString("en-GB", {
+            {new Date(order.createdAt).toLocaleDateString("en-GB", {
               day: "numeric",
               month: "long",
               year: "numeric",
@@ -42,7 +82,7 @@ function OrderCard({ order }: { order: Order }) {
 
         <div className="text-right">
           <p className="text-gray-900 font-display font-semibold text-[1.1rem]">
-            ${order.total}
+            ${(order.totalCents / 100).toFixed(2)}
           </p>
         </div>
 
@@ -56,60 +96,35 @@ function OrderCard({ order }: { order: Order }) {
 
       {expanded && (
         <div className="border-t border-gray-100 p-4 sm:p-5 bg-gray-50">
-          <div className="flex flex-col gap-2 mb-5">
-            {order.items.map((item, i) => (
-              <div key={i} className="flex justify-between items-center">
+          <div className="flex flex-col gap-2 mb-4">
+            {order.items.map((item) => (
+              <div key={item.id} className="flex justify-between items-center">
                 <span className="text-gray-700 text-sm font-sans">
-                  {item.name} × {item.quantity}
+                  {item.itemName} × {item.quantity}
                 </span>
                 <span className="text-gray-700 text-sm font-sans font-bold">
-                  ${item.price * item.quantity}
+                  ${(item.lineTotalCents / 100).toFixed(2)}
                 </span>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            {order.status === "Pending" && (
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:bg-white transition-colors text-sm font-sans font-bold"
-              >
-                <FileText className="w-4 h-4" />
-                Download unofficial invoice
-              </button>
-            )}
-
-            {order.status === "Payment Link Sent" && order.paymentLink && (
-              <a
-                href={order.paymentLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-blue text-white transition-colors text-sm font-sans font-bold hover:opacity-90"
-              >
-                Pay via Zeffy
-              </a>
-            )}
-
-            {(order.status === "Paid" || order.status === "Fulfilled") && order.invoiceUrl && (
-              <a
-                href={order.invoiceUrl}
-                onClick={(e) => e.preventDefault()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-green text-white transition-colors text-sm font-sans font-bold hover:opacity-90"
-              >
-                <Download className="w-4 h-4" />
-                Download donation receipt (PDF)
-              </a>
-            )}
-          </div>
+          {order.notes && (
+            <p className="text-gray-500 text-sm font-sans">
+              <span className="font-semibold">Notes:</span> {order.notes}
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// ─── Main component ──────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const { user, isLoggedIn } = useAuth();
+  const { userOrders } = useLoaderData<typeof loader>();
   const [activeTab, setActiveTab] = useState<TabKey>("all");
 
   if (!isLoggedIn) {
@@ -136,13 +151,14 @@ export default function DashboardPage() {
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "all", label: "All orders" },
-    { key: "Pending", label: "Pending" },
-    { key: "Paid", label: "Paid" },
-    { key: "Fulfilled", label: "Fulfilled" },
+    { key: "pending", label: "Pending" },
+    { key: "confirmed", label: "Confirmed" },
+    { key: "processing", label: "Processing" },
+    { key: "delivered", label: "Delivered" },
   ];
 
   const filtered =
-    activeTab === "all" ? mockOrders : mockOrders.filter((o) => o.status === activeTab);
+    activeTab === "all" ? userOrders : userOrders.filter((o) => o.status === activeTab);
 
   return (
     <div className="bg-gray-50 min-h-screen">

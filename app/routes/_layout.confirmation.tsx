@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { CheckCircle, ShoppingBag, Clock } from "lucide-react";
 
 export function meta() {
@@ -27,6 +27,9 @@ const steps = [
 ] as const;
 
 export default function ConfirmationPage() {
+  const [searchParams] = useSearchParams();
+  const orderId = searchParams.get("orderId");
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="max-w-lg w-full">
@@ -39,10 +42,15 @@ export default function ConfirmationPage() {
             Order placed!
           </h1>
 
+          {orderId && (
+            <p className="text-gray-400 text-sm font-mono mb-4">
+              Order ref: {orderId.slice(0, 8)}…
+            </p>
+          )}
+
           <p className="text-gray-600 mb-8 leading-[1.7] font-sans">
-            Thank you for your order. Our team will review it and send you a Zeffy donation
-            payment link via email within 1–2 business days. A PDF donation receipt will be
-            issued for your tax records.
+            Thank you for your order. Our team will review it and contact you
+            within 1–2 business days with next steps.
           </p>
 
           {/* Process steps */}

@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router";
 import { Trash2, ShoppingBag, ArrowRight, Package } from "lucide-react";
 import { useCart } from "~/components/providers/cart-provider";
+import { useAuth } from "~/components/providers/auth-provider";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
 import { getPackageById } from "~/lib/data/packages";
 
@@ -10,6 +11,7 @@ export function meta() {
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, total, count } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   if (items.length === 0) {
@@ -160,10 +162,10 @@ export default function CartPage() {
               </div>
 
               <button
-                onClick={() => navigate("/checkout")}
+                onClick={() => navigate(user ? "/checkout" : "/login?redirectTo=/checkout")}
                 className="w-full flex items-center justify-center gap-2 bg-brand-blue text-white py-3 rounded-full transition-colors hover:opacity-90 font-sans font-extrabold"
               >
-                Proceed to checkout
+                {user ? "Proceed to checkout" : "Sign in to checkout"}
                 <ArrowRight className="w-4 h-4" />
               </button>
 

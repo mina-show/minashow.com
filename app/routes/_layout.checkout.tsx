@@ -1,22 +1,40 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { useCart } from "~/components/providers/cart-provider";
 import { useAuth } from "~/components/providers/auth-provider";
+import { useAction } from "~/hooks/use-action";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
+import { getSessionUser } from "~/lib/auth/session.server";
+import { serverRedirect } from "~/lib/router/server-responses.server";
+import { submitOrderDefinition } from "~/lib/actions/submit-order/action-definition";
+
+export { action_handler as action } from "~/lib/actions/_core/action-runner.server";
 
 export function meta() {
   return [{ title: "Checkout — Minashow" }];
 }
 
-interface CheckoutForm {
+// ─── Loader: require auth ────────────────────────────────────────────────────
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const user = await getSessionUser(request);
+  if (!user) throw serverRedirect({ rawAbsolutePath: "/login?redirectTo=/checkout" });
+  return {};
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+interface CheckoutFormState {
   name: string;
   organization: string;
   email: string;
   phone: string;
+  shippingAddress: string;
   notes: string;
 }
 
@@ -25,23 +43,33 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState<CheckoutForm>({
+  const [form, setForm] = useState<CheckoutFormState>({
     name: user?.name ?? "",
     organization: "",
     email: user?.email ?? "",
     phone: "",
+    shippingAddress: "",
     notes: "",
   });
-  const [errors, setErrors] = useState<Partial<CheckoutForm>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Partial<CheckoutFormState>>({});
+
+  const { submit, isValidating } = useAction(submitOrderDefinition, {
+    onSuccess: (data) => {
+      clearCart();
+      navigate(`/confirmation?orderId=${data.orderId}`);
+    },
+    toastOnError: {
+      message: "Failed to place order. Please try again.",
+    },
+  });
 
   if (items.length === 0) {
     navigate("/shop");
     return null;
   }
 
-  const validate = (): Partial<CheckoutForm> => {
-    const e: Partial<CheckoutForm> = {};
+  const validate = (): Partial<CheckoutFormState> => {
+    const e: Partial<CheckoutFormState> = {};
     if (!form.name.trim()) e.name = "Name is required";
     if (!form.organization.trim()) e.organization = "Organization name is required";
     if (!form.email.trim()) e.email = "Email is required";
@@ -50,7 +78,7 @@ export default function CheckoutPage() {
     return e;
   };
 
-  const handleChange = (field: keyof CheckoutForm, value: string) => {
+  const handleChange = (field: keyof CheckoutFormState, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
   };
@@ -62,12 +90,22 @@ export default function CheckoutPage() {
       setErrors(errs);
       return;
     }
-    setSubmitting(true);
-    // Phase 2: POST to RR7 action → save order to DB → trigger SES email to admin
-    setTimeout(() => {
-      clearCart();
-      navigate("/confirmation");
-    }, 800);
+    submit({
+      customerName: form.name,
+      customerOrganization: form.organization,
+      customerEmail: form.email,
+      customerPhone: form.phone,
+      shippingAddress: form.shippingAddress || undefined,
+      notes: form.notes || undefined,
+      items: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image,
+        category: item.category,
+      })),
+    });
   };
 
   return (
@@ -185,6 +223,25 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
+                {/* Shipping address */}
+                <div className="sm:col-span-2">
+                  <Label
+                    htmlFor="shippingAddress"
+                    className="font-sans font-bold text-gray-700 mb-1.5 block"
+                  >
+                    Shipping address{" "}
+                    <span className="text-gray-400 font-normal">(optional)</span>
+                  </Label>
+                  <Textarea
+                    id="shippingAddress"
+                    value={form.shippingAddress}
+                    onChange={(e) => handleChange("shippingAddress", e.target.value)}
+                    placeholder="Street address, city, province/state, postal code, country"
+                    rows={2}
+                    className="rounded-xl bg-gray-50 border-gray-200 font-sans resize-none"
+                  />
+                </div>
+
                 {/* Notes */}
                 <div className="sm:col-span-2">
                   <Label
@@ -208,11 +265,11 @@ export default function CheckoutPage() {
 
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={isValidating}
               variant="primary-filled"
               className="w-full rounded-full py-3.5 font-sans font-extrabold"
             >
-              {submitting ? "Placing order…" : "Place order"}
+              {isValidating ? "Placing order…" : "Place order"}
             </Button>
           </form>
 

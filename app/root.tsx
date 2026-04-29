@@ -75,7 +75,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="text-center max-w-md w-full">
         <p
-          className="leading-none mb-4 text-gray-100 select-none"
+          className="leading-none mb-4 text-gray-900 select-none"
           style={{ fontFamily: "Fredoka, sans-serif", fontSize: "10rem", fontWeight: 700 }}
           aria-hidden="true"
         >

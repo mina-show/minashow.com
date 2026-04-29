@@ -86,7 +86,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       orderBy: [asc(sounds.sortOrder), asc(sounds.title)],
     }),
     db.query.orders.findMany({
-      with: { items: { with: { category: true } }, user: true },
+      with: { items: true, user: true },
       orderBy: [desc(orders.createdAt)],
     }),
   ]);
@@ -677,7 +677,7 @@ function OrderRow({ order }: { order: Order }) {
           {order.status}
         </span>
         <span className="font-mono text-xs text-gray-500 hidden sm:block">{order.id.slice(0, 8)}…</span>
-        <span className="flex-1 font-sans text-sm text-gray-700 font-semibold">{order.customerEmail}</span>
+        <span className="flex-1 font-sans text-sm text-gray-700 font-semibold">{order.customerName}</span>
         <span className="text-sm font-sans font-bold text-gray-900">
           ${(order.totalCents / 100).toFixed(2)}
         </span>
@@ -689,17 +689,21 @@ function OrderRow({ order }: { order: Order }) {
 
       {expanded && (
         <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100">
-          <div className="mt-3 mb-3 text-sm font-sans text-gray-600">
-            <p><span className="font-semibold">User:</span> {order.user?.name ?? "Guest"}</p>
+          <div className="mt-3 mb-3 text-sm font-sans text-gray-600 flex flex-col gap-0.5">
+            <p><span className="font-semibold">Name:</span> {order.customerName}</p>
+            <p><span className="font-semibold">Organization:</span> {order.customerOrganization}</p>
             <p><span className="font-semibold">Email:</span> {order.customerEmail}</p>
+            <p><span className="font-semibold">Phone:</span> {order.customerPhone}</p>
+            {order.shippingAddress && <p><span className="font-semibold">Shipping:</span> {order.shippingAddress}</p>}
             {order.notes && <p><span className="font-semibold">Notes:</span> {order.notes}</p>}
+            {order.assignedAdmin && <p><span className="font-semibold">Notified:</span> {order.assignedAdmin}</p>}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 p-3 mb-4">
             <p className="text-xs text-gray-400 font-sans font-bold mb-2">Items</p>
             {order.items.map((item) => (
               <div key={item.id} className="flex justify-between py-1 border-b border-gray-50 last:border-0 text-sm font-sans">
-                <span className="text-gray-700">{item.category.name} × {item.quantity}</span>
+                <span className="text-gray-700">{item.itemName} × {item.quantity}</span>
                 <span className="font-bold text-gray-900">${(item.lineTotalCents / 100).toFixed(2)}</span>
               </div>
             ))}
