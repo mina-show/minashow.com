@@ -86,7 +86,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       orderBy: [asc(sounds.sortOrder), asc(sounds.title)],
     }),
     db.query.orders.findMany({
-      with: { items: true, user: true },
+      with: { items: true, user: true, emailNotifications: true },
       orderBy: [desc(orders.createdAt)],
     }),
   ]);
@@ -712,6 +712,32 @@ function OrderRow({ order }: { order: Order }) {
               <span>${(order.totalCents / 100).toFixed(2)}</span>
             </div>
           </div>
+
+          {order.emailNotifications.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-100 p-3 mb-4">
+              <p className="text-xs text-gray-400 font-sans font-bold mb-2">Email notifications</p>
+              {order.emailNotifications.map((n) => (
+                <div key={n.id} className="flex flex-wrap items-center gap-2 py-1 border-b border-gray-50 last:border-0 text-sm font-sans">
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      n.status === "sent"
+                        ? "bg-green-100 text-green-700"
+                        : n.status === "failed"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {n.status}
+                  </span>
+                  <span className="text-xs text-gray-500 font-mono">{n.recipientRole}</span>
+                  <span className="flex-1 text-gray-700 truncate">{n.recipientEmail}</span>
+                  {n.errorMessage && (
+                    <span className="text-xs text-red-500 w-full sm:w-auto">{n.errorMessage}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-500 font-sans font-semibold">Update status:</span>

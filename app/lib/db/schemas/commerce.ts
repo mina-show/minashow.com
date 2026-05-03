@@ -8,25 +8,25 @@ import { categories } from "./catalog";
 // ---------------------------------------------------------------------------
 
 export const orderStatusEnum = pgEnum("order_status", [
-  "pending",      // Created, awaiting payment confirmation
-  "confirmed",    // Payment confirmed
-  "processing",   // Being prepared/fulfilled
-  "shipped",      // Dispatched to customer
-  "delivered",    // Received by customer
-  "cancelled",    // Cancelled before fulfilment
-  "refunded",     // Payment returned
+  "pending", // Created, awaiting payment confirmation
+  "confirmed", // Payment confirmed
+  "processing", // Being prepared/fulfilled
+  "shipped", // Dispatched to customer
+  "delivered", // Received by customer
+  "cancelled", // Cancelled before fulfilment
+  "refunded", // Payment returned
 ]);
 
 export const invoiceStatusEnum = pgEnum("invoice_status", [
-  "draft",   // Created, prices not yet filled
-  "sent",    // Sent to customer
-  "paid",    // Customer has paid
+  "draft", // Created, prices not yet filled
+  "sent", // Sent to customer
+  "paid", // Customer has paid
 ]);
 
 export const emailStatusEnum = pgEnum("email_status", [
-  "queued",  // Waiting to be sent
-  "sent",    // Successfully sent
-  "failed",  // Failed to send
+  "queued", // Waiting to be sent
+  "sent", // Successfully sent
+  "failed", // Failed to send
 ]);
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ export const orders = pgTable("orders", {
   customerEmail: varchar("customer_email", { length: 255 }).notNull(),
   customerPhone: varchar("customer_phone", { length: 50 }).notNull(),
   /** Shipping address for production/fulfillment */
-  shippingAddress: text("shipping_address"),
+  shippingAddress: text("shipping_address").notNull(),
   status: orderStatusEnum("status").notNull().default("pending"),
   /** Subtotal before any discounts/fees (cents) */
   subtotalCents: integer("subtotal_cents").notNull(),
@@ -112,8 +112,7 @@ export const orderItems = pgTable("order_items", {
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
   /** The category/package that was purchased (nullable for individual products) */
-  categoryId: uuid("category_id")
-    .references(() => categories.id, { onDelete: "restrict" }),
+  categoryId: uuid("category_id").references(() => categories.id, { onDelete: "restrict" }),
   /** Discriminator: "product" or "package" */
   itemType: varchar("item_type", { length: 50 }).notNull(),
   /** Snapshot of item name at purchase time */
@@ -152,8 +151,7 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
     .notNull()
     .references(() => invoices.id, { onDelete: "cascade" }),
   /** Links back to the original order item */
-  orderItemId: uuid("order_item_id")
-    .references(() => orderItems.id, { onDelete: "set null" }),
+  orderItemId: uuid("order_item_id").references(() => orderItems.id, { onDelete: "set null" }),
   description: varchar("description", { length: 500 }).notNull(),
   quantity: integer("quantity").notNull(),
   /** Admin fills this in — starts at 0 */

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { useCart } from "~/components/providers/cart-provider";
@@ -63,8 +63,16 @@ export default function CheckoutPage() {
     },
   });
 
-  if (items.length === 0) {
-    navigate("/shop");
+  // Redirect away from checkout if the cart is empty — but skip while a
+  // submission is in flight, otherwise the post-submit clearCart() races with
+  // navigate("/confirmation") and we end up on /shop instead.
+  useEffect(() => {
+    if (items.length === 0 && !isValidating) {
+      navigate("/shop");
+    }
+  }, [items.length, isValidating, navigate]);
+
+  if (items.length === 0 && !isValidating) {
     return null;
   }
 
@@ -75,6 +83,7 @@ export default function CheckoutPage() {
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Invalid email";
     if (!form.phone.trim()) e.phone = "Phone is required";
+    if (!form.shippingAddress.trim()) e.shippingAddress = "Shipping address is required";
     return e;
   };
 
@@ -95,7 +104,7 @@ export default function CheckoutPage() {
       customerOrganization: form.organization,
       customerEmail: form.email,
       customerPhone: form.phone,
-      shippingAddress: form.shippingAddress || undefined,
+      shippingAddress: form.shippingAddress,
       notes: form.notes || undefined,
       items: items.map((item) => ({
         id: item.id,
@@ -145,9 +154,8 @@ export default function CheckoutPage() {
                     value={form.name}
                     onChange={(e) => handleChange("name", e.target.value)}
                     placeholder="e.g. Mary Hanna"
-                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${
-                      errors.name ? "border-red-300" : ""
-                    }`}
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.name ? "border-red-300" : ""
+                      }`}
                   />
                   {errors.name && (
                     <p className="text-red-500 text-xs mt-1 font-sans">{errors.name}</p>
@@ -168,9 +176,8 @@ export default function CheckoutPage() {
                     value={form.organization}
                     onChange={(e) => handleChange("organization", e.target.value)}
                     placeholder="e.g. Sunrise Community Center"
-                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${
-                      errors.organization ? "border-red-300" : ""
-                    }`}
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.organization ? "border-red-300" : ""
+                      }`}
                   />
                   {errors.organization && (
                     <p className="text-red-500 text-xs mt-1 font-sans">{errors.organization}</p>
@@ -191,9 +198,8 @@ export default function CheckoutPage() {
                     value={form.email}
                     onChange={(e) => handleChange("email", e.target.value)}
                     placeholder="you@organization.org"
-                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${
-                      errors.email ? "border-red-300" : ""
-                    }`}
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.email ? "border-red-300" : ""
+                      }`}
                   />
                   {errors.email && (
                     <p className="text-red-500 text-xs mt-1 font-sans">{errors.email}</p>
@@ -214,9 +220,8 @@ export default function CheckoutPage() {
                     value={form.phone}
                     onChange={(e) => handleChange("phone", e.target.value)}
                     placeholder="+1 555 000 0000"
-                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${
-                      errors.phone ? "border-red-300" : ""
-                    }`}
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.phone ? "border-red-300" : ""
+                      }`}
                   />
                   {errors.phone && (
                     <p className="text-red-500 text-xs mt-1 font-sans">{errors.phone}</p>
@@ -229,8 +234,7 @@ export default function CheckoutPage() {
                     htmlFor="shippingAddress"
                     className="font-sans font-bold text-gray-700 mb-1.5 block"
                   >
-                    Shipping address{" "}
-                    <span className="text-gray-400 font-normal">(optional)</span>
+                    Shipping address
                   </Label>
                   <Textarea
                     id="shippingAddress"
@@ -238,8 +242,13 @@ export default function CheckoutPage() {
                     onChange={(e) => handleChange("shippingAddress", e.target.value)}
                     placeholder="Street address, city, province/state, postal code, country"
                     rows={2}
-                    className="rounded-xl bg-gray-50 border-gray-200 font-sans resize-none"
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans resize-none ${
+                      errors.shippingAddress ? "border-red-300" : ""
+                    }`}
                   />
+                  {errors.shippingAddress && (
+                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.shippingAddress}</p>
+                  )}
                 </div>
 
                 {/* Notes */}

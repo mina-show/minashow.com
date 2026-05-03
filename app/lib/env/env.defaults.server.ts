@@ -29,6 +29,23 @@ const serverEnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   /** Google OAuth 2.0 client secret */
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /**
+   * Gmail account used to send transactional emails via SMTP.
+   * Must be a Workspace user with 2FA + an app password generated.
+   * Optional: when unset, the email service runs in log-only mode (dev convenience).
+   */
+  GMAIL_USER: z.string().optional(),
+  /** App password for the GMAIL_USER account (16 chars, generated at myaccount.google.com/apppasswords) */
+  GMAIL_APP_PASSWORD: z.string().optional(),
+  /** From address for outbound mail. Must equal GMAIL_USER or be a Gmail "send-as" alias of it. Defaults to GMAIL_USER. */
+  GMAIL_FROM: z.string().optional(),
+  /**
+   * Dev-only override: when set, all admin/info emails (NOT customer receipts) are
+   * redirected to this address. Subject is prefixed with the original intended
+   * recipient so routing can still be verified visually.
+   * Leave unset in production.
+   */
+  EMAIL_DEV_REDIRECT_TO: z.string().optional(),
 });
 
 const vercelEnv = process.env.VERCEL_ENV;
