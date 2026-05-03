@@ -49,20 +49,28 @@ export const carts = pgTable("carts", {
 });
 
 /**
- * Cart items — each item is a category package.
- * Quantity is stored for flexibility but will typically be 1 per package.
+ * Cart items — supports both individual products and packages.
+ * Mirrors the order_items shape so checkout flow translates 1:1.
  */
 export const cartItems = pgTable("cart_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   cartId: uuid("cart_id")
     .notNull()
     .references(() => carts.id, { onDelete: "cascade" }),
-  /** The category/package being purchased */
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => categories.id, { onDelete: "restrict" }),
+  /** Discriminator: "product" or "package" */
+  itemType: varchar("item_type", { length: 50 }).notNull(),
+  /** Source id from the catalog (product id or package id) — uniquely identifies the line within a cart */
+  productOrPackageId: varchar("product_or_package_id", { length: 255 }).notNull(),
+  /** Snapshot of item name at time of add-to-cart */
+  itemName: varchar("item_name", { length: 255 }).notNull(),
+  /** Snapshot of item image */
+  itemImageUrl: text("item_image_url"),
+  /** Free-form category label from the catalog (e.g. "package", "costumes") */
+  itemCategory: varchar("item_category", { length: 255 }),
+  /** Optional FK to a catalog category — kept for back-references but not required */
+  categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
   quantity: integer("quantity").notNull().default(1),
-  /** Snapshot of category price (cents) at time of add-to-cart */
+  /** Snapshot of unit price (cents) at time of add-to-cart */
   unitPriceCents: integer("unit_price_cents").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

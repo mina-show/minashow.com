@@ -20,8 +20,19 @@ export function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const isActive = (to: string) =>
-    to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
+  const isActive = (to: string) => {
+    const path = location.pathname;
+    if (to === "/") return path === "/";
+    // "Shop" covers the catalog browse + any product/package detail page
+    if (to === "/shop") {
+      return (
+        path.startsWith("/shop") ||
+        path.startsWith("/product") ||
+        path.startsWith("/package")
+      );
+    }
+    return path.startsWith(to);
+  };
 
   /** Close user dropdown when clicking outside */
   useEffect(() => {

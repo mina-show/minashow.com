@@ -6,6 +6,8 @@ export default [
   route("login", "routes/login.tsx"),
   route("auth/google", "routes/auth.google.tsx"),
   route("auth/google/callback", "routes/auth.google.callback.tsx"),
+  // Resource route for action runner — invoked from providers/components
+  route("api/actions", "routes/api.actions.tsx"),
   route("*", "routes/$.tsx"),
 
   // ── Main layout ───────────────────────────────────────────────────────────

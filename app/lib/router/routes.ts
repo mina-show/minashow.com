@@ -9,6 +9,7 @@ import { components, hooks, utils } from "~/lib/router/generouted-components";
 export const routePaths = [
   "/",
   "/admin",
+  "/api/actions",
   "/auth/google",
   "/auth/google/callback",
   "/cart",
