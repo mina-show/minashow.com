@@ -4,6 +4,7 @@ import { ShoppingCart, Music2, Sparkles, ChevronRight, Package } from "lucide-re
 import { packages } from "~/lib/data/packages";
 import { products } from "~/lib/data/products";
 import { useCart } from "~/components/providers/cart-provider";
+import { useAuth } from "~/components/providers/auth-provider";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
 
 export function meta() {
@@ -15,6 +16,7 @@ export { ShopPage as default };
 // Shared shop component — used by both /shop and /shop/:category
 export function ShopPage({ initialCategory = "all" }: { initialCategory?: string }) {
   const { addItem } = useCart();
+  const { isAdmin } = useAuth();
   const [addedId, setAddedId] = useState<string | null>(null);
 
   const soundtracks = products.filter((p) => p.category === "soundtracks");
@@ -280,20 +282,22 @@ export function ShopPage({ initialCategory = "all" }: { initialCategory?: string
                         <p className="text-white/55 text-sm font-sans line-clamp-2 mb-3 leading-relaxed">
                           {p.description}
                         </p>
-                        <button
-                          onClick={() => handleAddSoundtrack(p.id, p.name, p.image)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold font-sans transition-all active:scale-95"
-                          style={{
-                            backgroundColor: isAdded ? "#a9d937" : "#fbf204",
-                            color: isAdded ? "#ffffff" : "#202973",
-                            boxShadow: isAdded
-                              ? "0 4px 14px rgba(169,217,55,0.4)"
-                              : "0 4px 14px rgba(251,242,4,0.3)",
-                          }}
-                        >
-                          <ShoppingCart className="w-3.5 h-3.5" />
-                          {isAdded ? "Added!" : "Add"}
-                        </button>
+                        {!isAdmin && (
+                          <button
+                            onClick={() => handleAddSoundtrack(p.id, p.name, p.image)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold font-sans transition-all active:scale-95"
+                            style={{
+                              backgroundColor: isAdded ? "#a9d937" : "#fbf204",
+                              color: isAdded ? "#ffffff" : "#202973",
+                              boxShadow: isAdded
+                                ? "0 4px 14px rgba(169,217,55,0.4)"
+                                : "0 4px 14px rgba(251,242,4,0.3)",
+                            }}
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                            {isAdded ? "Added!" : "Add"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

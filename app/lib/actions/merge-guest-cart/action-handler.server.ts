@@ -17,6 +17,7 @@ export default createActionHandler(
 
     const user = await getSessionUser(request);
     if (!user) throw new ReadableError("You must be signed in to merge your cart.");
+    if (user.role === "admin") throw new ReadableError("Admin accounts do not have a cart.");
 
     // Find or create the user's cart
     let cart = await db.query.carts.findFirst({

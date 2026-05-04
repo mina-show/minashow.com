@@ -3,7 +3,7 @@ import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { Package, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "~/components/providers/auth-provider";
-import { getSessionUser } from "~/lib/auth/session.server";
+import { forbidAdmin } from "~/lib/auth/admin.server";
 import { db } from "~/lib/db/client";
 import { orders } from "~/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -27,7 +27,9 @@ const STATUS_COLORS: Record<string, string> = {
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await getSessionUser(request);
+  // Admins can't have personal orders — bounce them to /admin.
+  // Guests pass through and see the "Sign in" CTA.
+  const user = await forbidAdmin(request);
   if (!user) return { userOrders: [] };
 
   const userOrders = await db.query.orders.findMany({

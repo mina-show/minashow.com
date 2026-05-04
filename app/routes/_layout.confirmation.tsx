@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router";
 import { CheckCircle, ShoppingBag, Clock } from "lucide-react";
+import { useAuth } from "~/components/providers/auth-provider";
 
 export function meta() {
   return [{ title: "Order Placed — Minashow" }];
@@ -29,6 +30,7 @@ const steps = [
 export default function ConfirmationPage() {
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get("orderId");
+  const { isAdmin } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -67,12 +69,14 @@ export default function ConfirmationPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              to="/dashboard"
-              className="flex-1 py-3 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-center font-sans font-bold"
-            >
-              My orders
-            </Link>
+            {!isAdmin && (
+              <Link
+                to="/dashboard"
+                className="flex-1 py-3 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-center font-sans font-bold"
+              >
+                My orders
+              </Link>
+            )}
             <Link
               to="/shop"
               className="flex-1 py-3 rounded-full bg-brand-blue text-white transition-colors text-center hover:opacity-90 font-sans font-extrabold"

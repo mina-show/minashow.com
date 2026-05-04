@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router";
 import { ShoppingCart, ChevronRight, Minus, Plus, Tag } from "lucide-react";
 import { getProductById, categories, getProductsByCategory } from "~/lib/data/products";
 import { useCart } from "~/components/providers/cart-provider";
+import { useAuth } from "~/components/providers/auth-provider";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
 
 export function meta() {
@@ -21,6 +22,7 @@ export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addItem, items } = useCart();
+  const { isAdmin } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
@@ -156,58 +158,62 @@ export default function ProductPage() {
             {/* Divider */}
             <div className="mb-8 pb-1" style={{ borderBottom: "2px dashed #e5e7eb" }} />
 
-            {/* Quantity + Add to cart */}
-            <div className="flex flex-wrap items-stretch gap-3 mb-3">
-              {/* Qty stepper */}
-              <div
-                className="flex items-center rounded-2xl overflow-hidden bg-white"
-                style={{ border: "2px solid #e5e7eb" }}
-              >
-                <button
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-                  aria-label="Decrease quantity"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <span className="w-12 text-center text-gray-900 font-extrabold font-sans text-lg select-none">
-                  {quantity}
-                </span>
-                <button
-                  onClick={() => setQuantity((q) => q + 1)}
-                  className="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-                  aria-label="Increase quantity"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
+            {/* Quantity + Add to cart — hidden from admins (admins don't purchase) */}
+            {!isAdmin && (
+              <>
+                <div className="flex flex-wrap items-stretch gap-3 mb-3">
+                  {/* Qty stepper */}
+                  <div
+                    className="flex items-center rounded-2xl overflow-hidden bg-white"
+                    style={{ border: "2px solid #e5e7eb" }}
+                  >
+                    <button
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      className="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-12 text-center text-gray-900 font-extrabold font-sans text-lg select-none">
+                      {quantity}
+                    </span>
+                    <button
+                      onClick={() => setQuantity((q) => q + 1)}
+                      className="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
 
-              {/* CTA button */}
-              <button
-                onClick={handleAddToCart}
-                className="flex-1 flex items-center justify-center gap-2.5 py-3 px-6 rounded-2xl font-extrabold font-sans text-base transition-all active:scale-[0.97]"
-                style={{
-                  backgroundColor: added ? "#a9d937" : colors.bg,
-                  color: added ? "#ffffff" : colors.text,
-                  boxShadow: added
-                    ? "0 8px 28px rgba(169,217,55,0.45)"
-                    : `0 8px 28px ${colors.shadow}`,
-                  minHeight: "48px",
-                }}
-              >
-                <ShoppingCart className="w-5 h-5" />
-                {added ? "✓ Added to cart!" : isInCart ? "Add more" : "Add to cart"}
-              </button>
-            </div>
+                  {/* CTA button */}
+                  <button
+                    onClick={handleAddToCart}
+                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-6 rounded-2xl font-extrabold font-sans text-base transition-all active:scale-[0.97]"
+                    style={{
+                      backgroundColor: added ? "#a9d937" : colors.bg,
+                      color: added ? "#ffffff" : colors.text,
+                      boxShadow: added
+                        ? "0 8px 28px rgba(169,217,55,0.45)"
+                        : `0 8px 28px ${colors.shadow}`,
+                      minHeight: "48px",
+                    }}
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    {added ? "✓ Added to cart!" : isInCart ? "Add more" : "Add to cart"}
+                  </button>
+                </div>
 
-            {isInCart && !added && (
-              <button
-                onClick={() => navigate("/cart")}
-                className="text-sm font-semibold text-center hover:underline font-sans mb-2 transition-opacity hover:opacity-70"
-                style={{ color: colors.bg }}
-              >
-                View cart →
-              </button>
+                {isInCart && !added && (
+                  <button
+                    onClick={() => navigate("/cart")}
+                    className="text-sm font-semibold text-center hover:underline font-sans mb-2 transition-opacity hover:opacity-70"
+                    style={{ color: colors.bg }}
+                  >
+                    View cart →
+                  </button>
+                )}
+              </>
             )}
 
             {/* Order process notice */}

@@ -41,8 +41,9 @@ const ACTIONS_ROUTE = "/api/actions";
 const SYNC_DEBOUNCE_MS = 800;
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  const { user, isAdmin } = useAuth();
+  // Admins never have a cart; treat them as cart-less for sync purposes too.
+  const userId = user && !isAdmin ? user.id : null;
 
   const [items, setItems] = useState<CartItem[]>([]);
   /** True after we've read localStorage (or a logged-in user has finished merging with the server). */
@@ -134,6 +135,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // ── Mutation API ───────────────────────────────────────────────────────────
   const addItem = (item: Omit<CartItem, "quantity">) => {
+    // Admins cannot purchase. Defensive no-op in case any UI path slips through.
+    if (isAdmin) return;
     setItems((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {

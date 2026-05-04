@@ -9,8 +9,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
-import { getSessionUser } from "~/lib/auth/session.server";
-import { serverRedirect } from "~/lib/router/server-responses.server";
+import { requireCustomer } from "~/lib/auth/admin.server";
 import { submitOrderDefinition } from "~/lib/actions/submit-order/action-definition";
 
 export { action_handler as action } from "~/lib/actions/_core/action-runner.server";
@@ -19,11 +18,10 @@ export function meta() {
   return [{ title: "Checkout — Minashow" }];
 }
 
-// ─── Loader: require auth ────────────────────────────────────────────────────
+// ─── Loader: customer-only ───────────────────────────────────────────────────
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await getSessionUser(request);
-  if (!user) throw serverRedirect({ rawAbsolutePath: "/login?redirectTo=/checkout" });
+  await requireCustomer(request);
   return {};
 }
 

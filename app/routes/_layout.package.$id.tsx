@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router";
 import { ShoppingCart, ChevronRight, ChevronLeft, X } from "lucide-react";
 import { getPackageById } from "~/lib/data/packages";
 import { useCart } from "~/components/providers/cart-provider";
+import { useAuth } from "~/components/providers/auth-provider";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
 
 export function meta() {
@@ -13,6 +14,7 @@ export default function PackageDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addItem, items } = useCart();
+  const { isAdmin } = useAuth();
   const [added, setAdded] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -96,32 +98,34 @@ export default function PackageDetailPage() {
           {pkg.description}
         </p>
 
-        {/* Add to cart */}
-        <div className="flex items-center gap-3 mb-12">
-          <button
-            onClick={handleRequest}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl font-extrabold font-sans text-base transition-all active:scale-[0.97]"
-            style={{
-              backgroundColor: added ? "#a9d937" : pkg.color,
-              color: "#ffffff",
-              boxShadow: added
-                ? "0 6px 20px rgba(169,217,55,0.4)"
-                : `0 6px 20px ${pkg.color}45`,
-            }}
-          >
-            <ShoppingCart className="w-5 h-5" />
-            {added ? "✓ Added to cart!" : isInCart ? "Added — add again" : "Add to Cart"}
-          </button>
-
-          {isInCart && !added && (
+        {/* Add to cart — hidden from admins (admins don't purchase) */}
+        {!isAdmin && (
+          <div className="flex items-center gap-3 mb-12">
             <button
-              onClick={() => navigate("/cart")}
-              className="text-sm font-semibold font-sans text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={handleRequest}
+              className="flex items-center gap-2 px-6 py-3 rounded-2xl font-extrabold font-sans text-base transition-all active:scale-[0.97]"
+              style={{
+                backgroundColor: added ? "#a9d937" : pkg.color,
+                color: "#ffffff",
+                boxShadow: added
+                  ? "0 6px 20px rgba(169,217,55,0.4)"
+                  : `0 6px 20px ${pkg.color}45`,
+              }}
             >
-              View cart →
+              <ShoppingCart className="w-5 h-5" />
+              {added ? "✓ Added to cart!" : isInCart ? "Added — add again" : "Add to Cart"}
             </button>
-          )}
-        </div>
+
+            {isInCart && !added && (
+              <button
+                onClick={() => navigate("/cart")}
+                className="text-sm font-semibold font-sans text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                View cart →
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Gallery */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">

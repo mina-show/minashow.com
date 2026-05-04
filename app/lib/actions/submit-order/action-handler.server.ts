@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createActionHandler, parseActionInput } from "~/lib/actions/_core/action-utils";
 import { submitOrderDefinition } from "./action-definition";
 import { getSessionUser } from "~/lib/auth/session.server";
 import { db } from "~/lib/db/client";
-import { orders, orderItems } from "~/lib/db/schema";
+import { carts, cartItems, orders, orderItems } from "~/lib/db/schema";
 import { ReadableError } from "~/lib/readable-error";
 import { routeOrderEmails } from "~/lib/email/order-email-router.server";
 
@@ -12,10 +12,13 @@ export default createActionHandler(
   async ({ inputData: unsafeInputData }, request) => {
     const input = parseActionInput(submitOrderDefinition, unsafeInputData);
 
-    // Require authenticated user
+    // Customer-only: admins cannot place orders.
     const user = await getSessionUser(request);
     if (!user) {
       throw new ReadableError("You must be signed in to place an order.");
+    }
+    if (user.role === "admin") {
+      throw new ReadableError("Admin accounts cannot place orders.");
     }
 
     // Compute totals (cents)
@@ -33,7 +36,7 @@ export default createActionHandler(
         customerOrganization: input.customerOrganization,
         customerEmail: input.customerEmail,
         customerPhone: input.customerPhone,
-        shippingAddress: input.shippingAddress ?? null,
+        shippingAddress: input.shippingAddress,
         subtotalCents,
         totalCents: subtotalCents,
         notes: input.notes ?? null,
@@ -54,6 +57,16 @@ export default createActionHandler(
           lineTotalCents: unitPriceCents * item.quantity,
         };
       })
+    );
+
+    // Clear the user's persisted cart now that the items have been promoted to an order.
+    // Doing this server-side closes a small race: the client's debounced sync-user-cart
+    // would otherwise need to fire before the user closes the tab.
+    await db.delete(cartItems).where(
+      inArray(
+        cartItems.cartId,
+        db.select({ id: carts.id }).from(carts).where(eq(carts.userId, user.id))
+      )
     );
 
     // Fan out notifications. Email failures must not block the order — they're

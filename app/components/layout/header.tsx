@@ -74,18 +74,20 @@ export function Header() {
 
         {/* Right: cart + auth */}
         <div className="flex items-center gap-3">
-          <Link
-            to="/cart"
-            className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-            aria-label={`Cart (${count} items)`}
-          >
-            <ShoppingCart className="w-5 h-5 text-gray-700" />
-            {count > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                {count > 9 ? "9+" : count}
-              </span>
-            )}
-          </Link>
+          {!isAdmin && (
+            <Link
+              to="/cart"
+              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label={`Cart (${count} items)`}
+            >
+              <ShoppingCart className="w-5 h-5 text-gray-700" />
+              {count > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                  {count > 9 ? "9+" : count}
+                </span>
+              )}
+            </Link>
+          )}
 
           {user ? (
             /* User dropdown */
@@ -131,14 +133,16 @@ export function Header() {
                     Profile
                   </Link>
 
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors font-sans"
-                  >
-                    <Package className="w-4 h-4 text-gray-400" />
-                    My Orders
-                  </Link>
+                  {!isAdmin && (
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors font-sans"
+                    >
+                      <Package className="w-4 h-4 text-gray-400" />
+                      My Orders
+                    </Link>
+                  )}
 
                   <div className="border-t border-gray-100 mt-1 pt-1">
                     <button
@@ -221,14 +225,16 @@ export function Header() {
                   <User className="w-4 h-4 text-gray-400" />
                   Profile
                 </Link>
-                <Link
-                  to="/dashboard"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 font-sans"
-                >
-                  <Package className="w-4 h-4 text-gray-400" />
-                  My Orders
-                </Link>
+                {!isAdmin && (
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 font-sans"
+                  >
+                    <Package className="w-4 h-4 text-gray-400" />
+                    My Orders
+                  </Link>
+                )}
                 <button
                   onClick={() => {
                     logout();

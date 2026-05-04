@@ -1,12 +1,19 @@
 import { Link, useNavigate } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { Trash2, ShoppingBag, ArrowRight, Package } from "lucide-react";
 import { useCart } from "~/components/providers/cart-provider";
 import { useAuth } from "~/components/providers/auth-provider";
 import { ImageWithFallback } from "~/components/misc/image-with-fallback";
 import { getPackageById } from "~/lib/data/packages";
+import { forbidAdmin } from "~/lib/auth/admin.server";
 
 export function meta() {
   return [{ title: "Your Cart — Minashow" }];
+}
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  await forbidAdmin(request);
+  return null;
 }
 
 export default function CartPage() {
