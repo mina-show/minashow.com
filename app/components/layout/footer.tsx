@@ -1,42 +1,7 @@
-import { useState } from "react";
 import { Link } from "react-router";
 import { Mail, Instagram, Facebook, Youtube } from "lucide-react";
 import { LogoMark } from "./logo-mark";
-
-/**
- * Email assembled from parts and only on click, so the address never appears in
- * the server-rendered HTML where scrapers harvest it.
- */
-const EMAIL_USER = "info";
-const EMAIL_DOMAIN = "minashow.com";
-
-function RevealEmail() {
-  const [revealed, setRevealed] = useState(false);
-
-  if (!revealed) {
-    return (
-      <button
-        type="button"
-        onClick={() => setRevealed(true)}
-        className="flex items-center gap-2 text-sm hover:text-white transition-colors mb-4 font-sans"
-      >
-        <Mail className="w-4 h-4" />
-        Reveal email
-      </button>
-    );
-  }
-
-  const email = `${EMAIL_USER}@${EMAIL_DOMAIN}`;
-  return (
-    <a
-      href={`mailto:${email}`}
-      className="flex items-center gap-2 text-sm hover:text-white transition-colors mb-4 font-sans"
-    >
-      <Mail className="w-4 h-4" />
-      {email}
-    </a>
-  );
-}
+import { RevealEmail } from "~/components/misc/reveal-email";
 
 const shopLinks = ["Mascots", "Costumes", "Soundtracks"] as const;
 
@@ -102,7 +67,12 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h4 className="text-white mb-4 text-sm font-sans font-bold">Get in Touch</h4>
-            <RevealEmail />
+            <RevealEmail
+              user="info"
+              domain="minashow.com"
+              leadingIcon={<Mail className="w-4 h-4" />}
+              className="flex items-center gap-2 text-sm hover:text-white transition-colors mb-4 font-sans"
+            />
             <div className="flex gap-3">
               {socialLinks.map(({ Icon, bgClass, label }) => (
                 <a

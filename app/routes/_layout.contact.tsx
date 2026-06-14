@@ -3,6 +3,7 @@ import { useFetcher, useLoaderData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { Mail, MessageSquare, CheckCircle } from "lucide-react";
+import { RevealEmail } from "~/components/misc/reveal-email";
 import { sendEmail } from "~/lib/email/email-client.server";
 import { renderContactEmail } from "~/lib/email/templates/contact.server";
 import { verifyTurnstileToken } from "~/lib/security/turnstile.server";
@@ -296,12 +297,11 @@ export default function ContactPage() {
         <div className="mt-6">
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <p className="text-gray-500 text-sm mb-1 font-sans">Email us directly</p>
-            <a
-              href="mailto:info@minashow.com"
-              className="font-semibold transition-colors hover:opacity-80 font-sans text-brand-orange"
-            >
-              info@minashow.com
-            </a>
+            <RevealEmail
+              user="info"
+              domain="minashow.com"
+              className="inline-flex items-center gap-2 font-semibold transition-colors hover:opacity-80 font-sans text-brand-orange"
+            />
           </div>
         </div>
       </div>
