@@ -4,6 +4,8 @@ export default [
   // ── Standalone routes (no main layout) ───────────────────────────────────
   route("logout", "routes/logout.tsx"),
   route("login", "routes/login.tsx"),
+  route("forgot-password", "routes/forgot-password.tsx"),
+  route("reset-password", "routes/reset-password.tsx"),
   route("auth/google", "routes/auth.google.tsx"),
   route("auth/google/callback", "routes/auth.google.callback.tsx"),
   // Resource route for action runner — invoked from providers/components

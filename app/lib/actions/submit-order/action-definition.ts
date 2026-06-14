@@ -11,7 +11,12 @@ export const submitOrderDefinition = defineAction<{
     customerOrganization: z.string().min(1, "Organization is required"),
     customerEmail: z.string().email("Invalid email"),
     customerPhone: z.string().min(1, "Phone is required"),
-    shippingAddress: z.string().min(1, "Shipping address is required"),
+    addressLine1: z.string().min(1, "Address is required"),
+    addressLine2: z.string().optional(),
+    city: z.string().min(1, "City is required"),
+    province: z.string().min(1, "Province/State is required"),
+    postalCode: z.string().min(1, "Postal code is required"),
+    country: z.string().min(1, "Country is required"),
     notes: z.string().optional(),
     items: z.array(
       z.object({

@@ -152,6 +152,7 @@ export async function routeOrderEmails(
         text: p.text,
         replyTo: p.replyTo,
         bcc: ARCHIVE_BCC,
+        from: serverEnv.EMAIL_FROM_ORDERS,
       })
     )
   );

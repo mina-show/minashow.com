@@ -30,15 +30,20 @@ const serverEnvSchema = z.object({
   /** Google OAuth 2.0 client secret */
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   /**
-   * Gmail account used to send transactional emails via SMTP.
-   * Must be a Workspace user with 2FA + an app password generated.
+   * Resend API key used to send all transactional email.
    * Optional: when unset, the email service runs in log-only mode (dev convenience).
    */
-  GMAIL_USER: z.string().optional(),
-  /** App password for the GMAIL_USER account (16 chars, generated at myaccount.google.com/apppasswords) */
-  GMAIL_APP_PASSWORD: z.string().optional(),
-  /** From address for outbound mail. Must equal GMAIL_USER or be a Gmail "send-as" alias of it. Defaults to GMAIL_USER. */
-  GMAIL_FROM: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  /**
+   * From address for order-related mail (admin routing + customer receipts).
+   * e.g. `Minashow Orders <order@minashow.com>` — domain must be verified in Resend.
+   */
+  EMAIL_FROM_ORDERS: z.string().optional(),
+  /**
+   * Default from address for general/account mail (contact form, password reset).
+   * e.g. `Minashow <info@minashow.com>` — domain must be verified in Resend.
+   */
+  EMAIL_FROM_INFO: z.string().optional(),
   /**
    * Dev-only override: when set, all admin/info emails (NOT customer receipts) are
    * redirected to this address. Subject is prefixed with the original intended
@@ -46,6 +51,17 @@ const serverEnvSchema = z.object({
    * Leave unset in production.
    */
   EMAIL_DEV_REDIRECT_TO: z.string().optional(),
+  /**
+   * Cloudflare Turnstile site key (public — rendered in the widget).
+   * Passed to the client via route loaders. Optional: when unset the widget is
+   * not rendered (dev convenience).
+   */
+  TURNSTILE_SITE_KEY: z.string().optional(),
+  /**
+   * Cloudflare Turnstile secret key (server-side token verification).
+   * Optional: when unset, verification is skipped (dev convenience).
+   */
+  TURNSTILE_SECRET_KEY: z.string().optional(),
 });
 
 const vercelEnv = process.env.VERCEL_ENV;

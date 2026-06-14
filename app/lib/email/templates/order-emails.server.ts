@@ -7,6 +7,7 @@
  *
  * Inline styles only — most email clients strip <style> blocks and external CSS.
  */
+import { shippingAddressLines } from "~/lib/format/shipping-address";
 
 const BRAND_BLUE = "#202973";
 const TEXT_GRAY = "#374151";
@@ -27,7 +28,12 @@ export interface EmailOrderContext {
   customerOrganization: string;
   customerEmail: string;
   customerPhone: string;
-  shippingAddress?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
   notes?: string | null;
   items: EmailOrderItem[];
   /** Order subtotal in dollars */
@@ -85,7 +91,7 @@ function renderShell(args: {
           ${escapeHtml(context.customerOrganization)}<br/>
           ${escapeHtml(context.customerEmail)}<br/>
           ${escapeHtml(context.customerPhone)}
-          ${context.shippingAddress ? `<br/><br/><span style="color:${MUTED_GRAY};font-size:13px;font-weight:600;">SHIPPING</span><br/>${escapeHtml(context.shippingAddress).replace(/\n/g, "<br/>")}` : ""}
+          <br/><br/><span style="color:${MUTED_GRAY};font-size:13px;font-weight:600;">SHIPPING</span><br/>${shippingAddressLines(context).map(escapeHtml).join("<br/>")}
           ${context.notes ? `<br/><br/><span style="color:${MUTED_GRAY};font-size:13px;font-weight:600;">NOTES</span><br/>${escapeHtml(context.notes).replace(/\n/g, "<br/>")}` : ""}
         </td>
       </tr>

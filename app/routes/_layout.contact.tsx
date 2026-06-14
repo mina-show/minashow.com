@@ -1,22 +1,101 @@
 import { useState } from "react";
+import { useFetcher, useLoaderData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { Mail, MessageSquare, CheckCircle } from "lucide-react";
+import { sendEmail } from "~/lib/email/email-client.server";
+import { renderContactEmail } from "~/lib/email/templates/contact.server";
+import { verifyTurnstileToken } from "~/lib/security/turnstile.server";
+import { serverEnv } from "~/lib/env/env.defaults.server";
 
 export function meta() {
   return [{ title: "Contact — Minashow" }];
 }
 
+/** Where contact submissions land, plus the silent archival copy. */
+const INFO_ADDRESS = "info@minashow.com";
+const ARCHIVE_BCC = "tech@minashow.com";
+
+const EMAIL_RE = /\S+@\S+\.\S+/;
+
+type FieldErrors = { name?: string; email?: string; message?: string };
+type ActionResult =
+  | { ok: true }
+  | { ok: false; errors?: FieldErrors; formError?: string };
+
+// ─── Loader ─────────────────────────────────────────────────────────────────
+
+export function loader() {
+  // Site key is public — safe to ship to the client to render the widget.
+  return { turnstileSiteKey: serverEnv.TURNSTILE_SITE_KEY ?? null };
+}
+
+// ─── Action ─────────────────────────────────────────────────────────────────
+
+export async function action({ request }: ActionFunctionArgs): Promise<ActionResult> {
+  const fd = await request.formData();
+  const name = ((fd.get("name") as string) ?? "").trim();
+  const email = ((fd.get("email") as string) ?? "").trim();
+  const subject = ((fd.get("subject") as string) ?? "").trim();
+  const message = ((fd.get("message") as string) ?? "").trim();
+  const turnstileToken = (fd.get("cf-turnstile-response") as string) ?? "";
+
+  // Bot gate first — don't waste work on unverified submissions.
+  const remoteIp = request.headers.get("CF-Connecting-IP") ?? undefined;
+  const verified = await verifyTurnstileToken(turnstileToken, remoteIp);
+  if (!verified) {
+    return { ok: false, formError: "Verification failed. Please try again." };
+  }
+
+  // Server-side validation mirrors the client gate (defense in depth).
+  const errors: FieldErrors = {};
+  if (!name) errors.name = "Required";
+  if (!email) errors.email = "Required";
+  else if (!EMAIL_RE.test(email)) errors.email = "Invalid email";
+  if (!message) errors.message = "Required";
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  const tpl = renderContactEmail({ name, email, subject, message });
+  await sendEmail({
+    to: INFO_ADDRESS,
+    bcc: ARCHIVE_BCC,
+    // Reply-To = the visitor, so staff can respond in one click.
+    replyTo: email,
+    from: serverEnv.EMAIL_FROM_INFO,
+    subject: tpl.subject,
+    html: tpl.html,
+    text: tpl.text,
+  });
+
+  return { ok: true };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 type FormState = { name: string; email: string; subject: string; message: string };
 
 export default function ContactPage() {
+  const { turnstileSiteKey } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<ActionResult>();
   const [form, setForm] = useState<FormState>({ name: "", email: "", subject: "", message: "" });
-  const [errors, setErrors] = useState<Partial<FormState>>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  // Turnstile token, populated by the widget's onSuccess. Required to submit.
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
-  const validate = (): Partial<FormState> => {
-    const e: Partial<FormState> = {};
+  const submitted = fetcher.data?.ok === true;
+  const isSubmitting = fetcher.state === "submitting";
+  // Server-returned validation errors (rare — client gate catches most).
+  const serverErrors = fetcher.data && !fetcher.data.ok ? fetcher.data.errors : undefined;
+  const formError = fetcher.data && !fetcher.data.ok ? fetcher.data.formError : undefined;
+  // Block submit until the visitor clears Turnstile (unless it isn't configured).
+  const needsTurnstile = Boolean(turnstileSiteKey);
+  const canSubmit = !isSubmitting && (!needsTurnstile || Boolean(turnstileToken));
+
+  const validate = (): FieldErrors => {
+    const e: FieldErrors = {};
     if (!form.name.trim()) e.name = "Required";
     if (!form.email.trim()) e.email = "Required";
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Invalid email";
+    else if (!EMAIL_RE.test(form.email)) e.email = "Invalid email";
     if (!form.message.trim()) e.message = "Required";
     return e;
   };
@@ -24,15 +103,27 @@ export default function ContactPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    // Phase 3: wire to AWS SES
-    setSubmitted(true);
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setErrors({});
+    // fetcher.submit serializes a plain object, so the widget's hidden input is
+    // not auto-included — pass the token explicitly under Cloudflare's field name.
+    fetcher.submit(
+      { ...form, "cf-turnstile-response": turnstileToken ?? "" },
+      { method: "post" }
+    );
   };
 
   const handleChange = (field: keyof FormState, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
-    if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
+    if (errors[field as keyof FieldErrors]) {
+      setErrors((e) => ({ ...e, [field]: undefined }));
+    }
   };
+
+  const fieldError = (field: keyof FieldErrors) => errors[field] ?? serverErrors?.[field];
 
   const inputCls = (error?: string) =>
     `w-full px-4 py-3 rounded-xl border bg-gray-50 text-gray-900 outline-none transition-colors focus:border-brand-orange focus:bg-white font-sans ${error ? "border-red-300" : "border-gray-200"
@@ -59,8 +150,9 @@ export default function ContactPage() {
           </p>
           <button
             onClick={() => {
-              setSubmitted(false);
               setForm({ name: "", email: "", subject: "", message: "" });
+              setTurnstileToken(null);
+              fetcher.load("/contact");
             }}
             className="text-sm text-gray-400 hover:text-gray-600 transition-colors font-sans"
           >
@@ -102,7 +194,8 @@ export default function ContactPage() {
       </section>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
-        <form
+        <fetcher.Form
+          method="post"
           onSubmit={handleSubmit}
           className="bg-white rounded-2xl border border-gray-100 p-6 sm:p-8 flex flex-col gap-4"
         >
@@ -113,13 +206,14 @@ export default function ContactPage() {
               </label>
               <input
                 type="text"
+                name="name"
                 value={form.name}
                 onChange={(e) => handleChange("name", e.target.value)}
                 placeholder="Your name"
-                className={inputCls(errors.name)}
+                className={inputCls(fieldError("name"))}
               />
-              {errors.name && (
-                <p className="text-red-500 text-xs mt-1 font-sans">{errors.name}</p>
+              {fieldError("name") && (
+                <p className="text-red-500 text-xs mt-1 font-sans">{fieldError("name")}</p>
               )}
             </div>
             <div>
@@ -128,13 +222,14 @@ export default function ContactPage() {
               </label>
               <input
                 type="email"
+                name="email"
                 value={form.email}
                 onChange={(e) => handleChange("email", e.target.value)}
                 placeholder="you@example.com"
-                className={inputCls(errors.email)}
+                className={inputCls(fieldError("email"))}
               />
-              {errors.email && (
-                <p className="text-red-500 text-xs mt-1 font-sans">{errors.email}</p>
+              {fieldError("email") && (
+                <p className="text-red-500 text-xs mt-1 font-sans">{fieldError("email")}</p>
               )}
             </div>
           </div>
@@ -146,6 +241,7 @@ export default function ContactPage() {
             </label>
             <input
               type="text"
+              name="subject"
               value={form.subject}
               onChange={(e) => handleChange("subject", e.target.value)}
               placeholder="e.g. Order question"
@@ -158,27 +254,43 @@ export default function ContactPage() {
               Message
             </label>
             <textarea
+              name="message"
               value={form.message}
               onChange={(e) => handleChange("message", e.target.value)}
               placeholder="How can we help?"
               rows={5}
-              className={`w-full px-4 py-3 rounded-xl border bg-gray-50 text-gray-900 outline-none transition-colors focus:border-brand-orange focus:bg-white resize-none font-sans ${errors.message ? "border-red-300" : "border-gray-200"
+              className={`w-full px-4 py-3 rounded-xl border bg-gray-50 text-gray-900 outline-none transition-colors focus:border-brand-orange focus:bg-white resize-none font-sans ${fieldError("message") ? "border-red-300" : "border-gray-200"
                 }`}
             />
-            {errors.message && (
-              <p className="text-red-500 text-xs mt-1 font-sans">{errors.message}</p>
+            {fieldError("message") && (
+              <p className="text-red-500 text-xs mt-1 font-sans">{fieldError("message")}</p>
             )}
           </div>
 
+          {turnstileSiteKey && (
+            <Turnstile
+              siteKey={turnstileSiteKey}
+              options={{ size: "flexible" }}
+              onSuccess={setTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
+          )}
+
+          {formError && (
+            <p className="text-red-500 text-sm font-sans text-center">{formError}</p>
+          )}
+
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 text-white py-3.5 rounded-full transition-colors hover:opacity-90 font-sans font-extrabold"
+            disabled={!canSubmit}
+            className="w-full flex items-center justify-center gap-2 text-white py-3.5 rounded-full transition-colors hover:opacity-90 font-sans font-extrabold disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ backgroundColor: "var(--brand-orange)" }}
           >
             <MessageSquare className="w-4 h-4" />
-            Send message
+            {isSubmitting ? "Sending…" : "Send message"}
           </button>
-        </form>
+        </fetcher.Form>
 
         {/* Direct contact */}
         <div className="mt-6">

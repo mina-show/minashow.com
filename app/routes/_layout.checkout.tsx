@@ -9,7 +9,15 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { requireCustomer } from "~/lib/auth/admin.server";
+import { countryNames, regionsForCountry } from "~/lib/geo/countries";
 import { submitOrderDefinition } from "~/lib/actions/submit-order/action-definition";
 
 export { action_handler as action } from "~/lib/actions/_core/action-runner.server";
@@ -32,7 +40,12 @@ interface CheckoutFormState {
   organization: string;
   email: string;
   phone: string;
-  shippingAddress: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
   notes: string;
 }
 
@@ -46,7 +59,12 @@ export default function CheckoutPage() {
     organization: "",
     email: user?.email ?? "",
     phone: "",
-    shippingAddress: "",
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    province: "",
+    postalCode: "",
+    country: "",
     notes: "",
   });
   const [errors, setErrors] = useState<Partial<CheckoutFormState>>({});
@@ -81,13 +99,27 @@ export default function CheckoutPage() {
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = "Invalid email";
     if (!form.phone.trim()) e.phone = "Phone is required";
-    if (!form.shippingAddress.trim()) e.shippingAddress = "Shipping address is required";
+    if (!form.addressLine1.trim()) e.addressLine1 = "Address is required";
+    if (!form.city.trim()) e.city = "City is required";
+    if (!form.country.trim()) e.country = "Country is required";
+    // Province is required only when the chosen country has subdivisions in the
+    // dataset; countries without them fall back to an optional free-text input.
+    if (regionsForCountry(form.country).length > 0 && !form.province.trim()) {
+      e.province = "Province/State is required";
+    }
+    if (!form.postalCode.trim()) e.postalCode = "Postal code is required";
     return e;
   };
 
   const handleChange = (field: keyof CheckoutFormState, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
     if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
+  };
+
+  // Changing country invalidates the previously selected province, so reset it.
+  const handleCountryChange = (country: string) => {
+    setForm((f) => ({ ...f, country, province: "" }));
+    setErrors((e) => ({ ...e, country: undefined, province: undefined }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -102,7 +134,12 @@ export default function CheckoutPage() {
       customerOrganization: form.organization,
       customerEmail: form.email,
       customerPhone: form.phone,
-      shippingAddress: form.shippingAddress,
+      addressLine1: form.addressLine1,
+      addressLine2: form.addressLine2 || undefined,
+      city: form.city,
+      province: form.province,
+      postalCode: form.postalCode,
+      country: form.country,
       notes: form.notes || undefined,
       items: items.map((item) => ({
         id: item.id,
@@ -114,6 +151,10 @@ export default function CheckoutPage() {
       })),
     });
   };
+
+  // Subdivisions for the chosen country. Empty → no dataset entries, so the
+  // province field falls back to free text.
+  const provinceRegions = regionsForCountry(form.country);
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -226,26 +267,161 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
-                {/* Shipping address */}
+                {/* Address line 1 */}
                 <div className="sm:col-span-2">
                   <Label
-                    htmlFor="shippingAddress"
+                    htmlFor="addressLine1"
                     className="font-sans font-bold text-gray-700 mb-1.5 block"
                   >
-                    Shipping address
+                    Address line 1
                   </Label>
-                  <Textarea
-                    id="shippingAddress"
-                    value={form.shippingAddress}
-                    onChange={(e) => handleChange("shippingAddress", e.target.value)}
-                    placeholder="Street address, city, province/state, postal code, country"
-                    rows={2}
-                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans resize-none ${
-                      errors.shippingAddress ? "border-red-300" : ""
-                    }`}
+                  <Input
+                    id="addressLine1"
+                    type="text"
+                    value={form.addressLine1}
+                    onChange={(e) => handleChange("addressLine1", e.target.value)}
+                    placeholder="e.g. 123 Main St"
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.addressLine1 ? "border-red-300" : ""
+                      }`}
                   />
-                  {errors.shippingAddress && (
-                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.shippingAddress}</p>
+                  {errors.addressLine1 && (
+                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.addressLine1}</p>
+                  )}
+                </div>
+
+                {/* Address line 2 */}
+                <div className="sm:col-span-2">
+                  <Label
+                    htmlFor="addressLine2"
+                    className="font-sans font-bold text-gray-700 mb-1.5 block"
+                  >
+                    Address line 2{" "}
+                    <span className="text-gray-400 font-normal">(optional)</span>
+                  </Label>
+                  <Input
+                    id="addressLine2"
+                    type="text"
+                    value={form.addressLine2}
+                    onChange={(e) => handleChange("addressLine2", e.target.value)}
+                    placeholder="Apt, suite, unit, etc."
+                    className="rounded-xl bg-gray-50 border-gray-200 font-sans"
+                  />
+                </div>
+
+                {/* Country — picked first so it can drive the province options */}
+                <div>
+                  <Label
+                    htmlFor="country"
+                    className="font-sans font-bold text-gray-700 mb-1.5 block"
+                  >
+                    Country
+                  </Label>
+                  <Select value={form.country} onValueChange={handleCountryChange}>
+                    <SelectTrigger
+                      id="country"
+                      className={`w-full rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.country ? "border-red-300" : ""
+                        }`}
+                    >
+                      <SelectValue placeholder="Select a country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countryNames.map((name) => (
+                        <SelectItem key={name} value={name} className="font-sans">
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.country && (
+                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.country}</p>
+                  )}
+                </div>
+
+                {/* Province / State — dropdown when the country has subdivisions,
+                    otherwise a free-text fallback */}
+                <div>
+                  <Label
+                    htmlFor="province"
+                    className="font-sans font-bold text-gray-700 mb-1.5 block"
+                  >
+                    Province / State
+                  </Label>
+                  {provinceRegions.length > 0 ? (
+                    <Select
+                      value={form.province}
+                      onValueChange={(v) => handleChange("province", v)}
+                    >
+                      <SelectTrigger
+                        id="province"
+                        className={`w-full rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.province ? "border-red-300" : ""
+                          }`}
+                      >
+                        <SelectValue placeholder="Select a province / state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {provinceRegions.map((region) => (
+                          <SelectItem key={region} value={region} className="font-sans">
+                            {region}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id="province"
+                      type="text"
+                      value={form.province}
+                      onChange={(e) => handleChange("province", e.target.value)}
+                      disabled={!form.country}
+                      placeholder={
+                        form.country ? "State / region (optional)" : "Select a country first"
+                      }
+                      className="rounded-xl bg-gray-50 border-gray-200 font-sans"
+                    />
+                  )}
+                  {errors.province && (
+                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.province}</p>
+                  )}
+                </div>
+
+                {/* City */}
+                <div>
+                  <Label htmlFor="city" className="font-sans font-bold text-gray-700 mb-1.5 block">
+                    City
+                  </Label>
+                  <Input
+                    id="city"
+                    type="text"
+                    value={form.city}
+                    onChange={(e) => handleChange("city", e.target.value)}
+                    placeholder="e.g. Toronto"
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.city ? "border-red-300" : ""
+                      }`}
+                  />
+                  {errors.city && (
+                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.city}</p>
+                  )}
+                </div>
+
+                {/* Postal code */}
+                <div>
+                  <Label
+                    htmlFor="postalCode"
+                    className="font-sans font-bold text-gray-700 mb-1.5 block"
+                  >
+                    Postal code
+                  </Label>
+                  <Input
+                    id="postalCode"
+                    type="text"
+                    value={form.postalCode}
+                    onChange={(e) => handleChange("postalCode", e.target.value)}
+                    placeholder="e.g. M5V 2T6"
+                    className={`rounded-xl bg-gray-50 border-gray-200 font-sans ${errors.postalCode ? "border-red-300" : ""
+                      }`}
+                  />
+                  {errors.postalCode && (
+                    <p className="text-red-500 text-xs mt-1 font-sans">{errors.postalCode}</p>
                   )}
                 </div>
 

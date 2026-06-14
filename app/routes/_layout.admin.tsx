@@ -10,6 +10,7 @@ import {
   orders,
 } from "~/lib/db/schema";
 import { requireAdmin } from "~/lib/auth/admin.server";
+import { shippingAddressLines } from "~/lib/format/shipping-address";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -694,7 +695,17 @@ function OrderRow({ order }: { order: Order }) {
             <p><span className="font-semibold">Organization:</span> {order.customerOrganization}</p>
             <p><span className="font-semibold">Email:</span> {order.customerEmail}</p>
             <p><span className="font-semibold">Phone:</span> {order.customerPhone}</p>
-            {order.shippingAddress && <p><span className="font-semibold">Shipping:</span> {order.shippingAddress}</p>}
+            <p>
+              <span className="font-semibold">Shipping:</span>{" "}
+              {shippingAddressLines({
+                addressLine1: order.shippingAddressLine1,
+                addressLine2: order.shippingAddressLine2,
+                city: order.shippingCity,
+                province: order.shippingProvince,
+                postalCode: order.shippingPostalCode,
+                country: order.shippingCountry,
+              }).join(", ")}
+            </p>
             {order.notes && <p><span className="font-semibold">Notes:</span> {order.notes}</p>}
             {order.assignedAdmin && <p><span className="font-semibold">Notified:</span> {order.assignedAdmin}</p>}
           </div>

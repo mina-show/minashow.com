@@ -1,29 +1,18 @@
-import nodemailer, { type Transporter } from "nodemailer";
+import { Resend } from "resend";
 import { serverEnv } from "~/lib/env/env.defaults.server";
 
 /**
- * SMTP transporter, lazily created on first use.
- * Reusing a single transporter pools the connection, which is meaningfully faster
- * than tearing down a new SMTP handshake for every send.
+ * Resend client, lazily created on first use so the module can be imported in
+ * environments where no API key is configured (dev / tests) without throwing.
  */
-let cachedTransporter: Transporter | null = null;
+let cachedClient: Resend | null = null;
 
-function getTransporter(): Transporter | null {
-  if (cachedTransporter) return cachedTransporter;
-  if (!serverEnv.GMAIL_USER || !serverEnv.GMAIL_APP_PASSWORD) return null;
+function getClient(): Resend | null {
+  if (cachedClient) return cachedClient;
+  if (!serverEnv.RESEND_API_KEY) return null;
 
-  cachedTransporter = nodemailer.createTransport({
-    service: "gmail",
-    // Pooled SMTP keeps the auth handshake warm across sends, which roughly
-    // halves total time when fanning out multiple emails per order.
-    pool: true,
-    maxConnections: 4,
-    auth: {
-      user: serverEnv.GMAIL_USER,
-      pass: serverEnv.GMAIL_APP_PASSWORD,
-    },
-  });
-  return cachedTransporter;
+  cachedClient = new Resend(serverEnv.RESEND_API_KEY);
+  return cachedClient;
 }
 
 export interface SendEmailInput {
@@ -34,6 +23,11 @@ export interface SendEmailInput {
   text?: string;
   replyTo?: string;
   bcc?: string;
+  /**
+   * Override the from address. Defaults to EMAIL_FROM_INFO (general/account mail).
+   * Order mail passes EMAIL_FROM_ORDERS.
+   */
+  from?: string;
 }
 
 export interface SendEmailResult {
@@ -42,23 +36,23 @@ export interface SendEmailResult {
   messageId: string | null;
   /** Error message if the send failed */
   error: string | null;
-  /** True when no SMTP creds were configured and the email was logged to console only */
+  /** True when no API key was configured and the email was logged to console only */
   loggedOnly: boolean;
 }
 
 /**
- * Send a transactional email via Gmail SMTP.
+ * Send a transactional email via Resend.
  *
- * If GMAIL_USER / GMAIL_APP_PASSWORD aren't set, the email is logged to console and
- * `loggedOnly: true` is returned — letting the order flow run end-to-end in dev
- * without real credentials.
+ * If RESEND_API_KEY isn't set, the email is logged to console and
+ * `loggedOnly: true` is returned — letting flows run end-to-end in dev without
+ * real credentials.
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const transporter = getTransporter();
+  const client = getClient();
   const from =
-    serverEnv.GMAIL_FROM ?? serverEnv.GMAIL_USER ?? "noreply@minashow.com";
+    input.from ?? serverEnv.EMAIL_FROM_INFO ?? "Minashow <info@minashow.com>";
 
-  if (!transporter) {
+  if (!client) {
     console.log("[email:log-only]", {
       from,
       to: input.to,
@@ -75,7 +69,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
 
   try {
-    const info = await transporter.sendMail({
+    const { data, error } = await client.emails.send({
       from,
       to: input.to,
       bcc: input.bcc,
@@ -84,9 +78,24 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       text: input.text,
       replyTo: input.replyTo,
     });
+
+    if (error) {
+      console.error("[email:send-failed]", {
+        to: input.to,
+        subject: input.subject,
+        error: error.message,
+      });
+      return {
+        success: false,
+        messageId: null,
+        error: error.message,
+        loggedOnly: false,
+      };
+    }
+
     return {
       success: true,
-      messageId: info.messageId,
+      messageId: data?.id ?? null,
       error: null,
       loggedOnly: false,
     };

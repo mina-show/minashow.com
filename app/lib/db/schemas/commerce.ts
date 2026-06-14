@@ -86,8 +86,14 @@ export const orders = pgTable("orders", {
   customerOrganization: varchar("customer_organization", { length: 255 }).notNull(),
   customerEmail: varchar("customer_email", { length: 255 }).notNull(),
   customerPhone: varchar("customer_phone", { length: 50 }).notNull(),
-  /** Shipping address for production/fulfillment */
-  shippingAddress: text("shipping_address").notNull(),
+  /** Shipping address for production/fulfillment — structured fields */
+  shippingAddressLine1: text("shipping_address_line1").notNull(),
+  /** Apt/suite/unit — optional */
+  shippingAddressLine2: text("shipping_address_line2"),
+  shippingCity: varchar("shipping_city", { length: 255 }).notNull(),
+  shippingProvince: varchar("shipping_province", { length: 255 }).notNull(),
+  shippingPostalCode: varchar("shipping_postal_code", { length: 50 }).notNull(),
+  shippingCountry: varchar("shipping_country", { length: 255 }).notNull(),
   status: orderStatusEnum("status").notNull().default("pending"),
   /** Subtotal before any discounts/fees (cents) */
   subtotalCents: integer("subtotal_cents").notNull(),

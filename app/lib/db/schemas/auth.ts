@@ -51,6 +51,24 @@ export const oauthAccounts = pgTable("oauth_accounts", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+/**
+ * Password reset tokens — single-use, short-lived.
+ * Only the SHA-256 hash is stored; the raw token is delivered via email and
+ * compared by re-hashing the user-supplied value during redemption.
+ */
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** SHA-256 of the raw token (64 hex chars) */
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  /** Stamped on redemption — enforces single-use */
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 /** Server-side sessions */
 export const sessions = pgTable("sessions", {
   /** Opaque session token stored in cookie */
@@ -73,6 +91,14 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   oauthAccounts: many(oauthAccounts),
   sessions: many(sessions),
+  passwordResetTokens: many(passwordResetTokens),
+}));
+
+export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [passwordResetTokens.userId],
+    references: [users.id],
+  }),
 }));
 
 export const userCredentialsRelations = relations(userCredentials, ({ one }) => ({

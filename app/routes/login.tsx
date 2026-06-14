@@ -108,6 +108,7 @@ export default function LoginPage() {
     searchParams.get("tab") === "register" ? "register" : "login"
   );
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const justReset = searchParams.get("reset") === "1";
   const fetcher = useFetcher<{ intent: string; error: string }>();
 
   const isLogin = activeTab === "login";
@@ -185,6 +186,12 @@ export default function LoginPage() {
                 <input type="hidden" name="intent" value="login" />
                 <input type="hidden" name="redirectTo" value={redirectTo} />
 
+                {justReset && (
+                  <p className="text-sm text-green-700 bg-green-50 border border-green-100 px-3 py-2 rounded-xl font-sans">
+                    Password updated. Sign in with your new password.
+                  </p>
+                )}
+
                 <div>
                   <label className="block text-gray-700 text-sm mb-1.5 font-sans font-bold">
                     Email
@@ -214,6 +221,13 @@ export default function LoginPage() {
                 >
                   {loading ? "Signing in…" : "Sign in"}
                 </button>
+
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors font-sans text-center"
+                >
+                  Forgot your password?
+                </Link>
               </fetcher.Form>
             ) : (
               <fetcher.Form method="post" className="flex flex-col gap-4">
