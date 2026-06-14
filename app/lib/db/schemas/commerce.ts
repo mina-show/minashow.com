@@ -144,6 +144,18 @@ export const invoices = pgTable("invoices", {
   /** Human-readable invoice number, e.g. INV-2026-0001 */
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
   status: invoiceStatusEnum("status").notNull().default("draft"),
+  /** Sum of line items before tax (cents) */
+  subtotalCents: integer("subtotal_cents").notNull().default(0),
+  /** Tax label shown on the invoice, e.g. "HST" */
+  taxLabel: varchar("tax_label", { length: 50 }),
+  /** Tax rate in basis points — e.g. 1300 = 13% */
+  taxRateBps: integer("tax_rate_bps").notNull().default(0),
+  /** Computed tax amount (cents) */
+  taxCents: integer("tax_cents").notNull().default(0),
+  /** Final amount due/charged = subtotal + tax (cents) */
+  totalCents: integer("total_cents").notNull().default(0),
+  /** When payment was recorded (invoice marked paid) */
+  paidAt: timestamp("paid_at"),
   sentAt: timestamp("sent_at"),
   sentToEmail: varchar("sent_to_email", { length: 255 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

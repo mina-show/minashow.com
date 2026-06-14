@@ -8,8 +8,16 @@ import {
   products,
   sounds,
   orders,
+  orderItems,
 } from "~/lib/db/schema";
 import { requireAdmin } from "~/lib/auth/admin.server";
+import {
+  saveInvoicePricing,
+  sendPaymentEmail,
+  sendPaidReceipt,
+  type PricedLineItem,
+} from "~/lib/invoices/invoice.server";
+import { ReadableError } from "~/lib/readable-error";
 import { shippingAddressLines } from "~/lib/format/shipping-address";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -40,6 +48,7 @@ import {
   Plus,
   ChevronDown,
   ChevronUp,
+  Download,
 } from "lucide-react";
 
 export function meta() {
@@ -71,6 +80,42 @@ function nullableNum(fd: FormData, k: string): number | null {
   const n = parseInt(v, 10);
   return isNaN(n) ? null : n;
 }
+/** Parse a dollar string (e.g. "12.50") to integer cents. Empty/NaN → 0. */
+function dollarsToCents(fd: FormData, k: string): number {
+  const v = parseFloat(str(fd, k));
+  return isNaN(v) ? 0 : Math.round(v * 100);
+}
+function nullableDollarsToCents(fd: FormData, k: string): number | null {
+  const raw = str(fd, k).trim();
+  if (raw === "") return null;
+  const v = parseFloat(raw);
+  return isNaN(v) ? null : Math.round(v * 100);
+}
+
+/**
+ * Build priced invoice line items from the submitted form: one `price_<itemId>`
+ * (dollars) per order item, with description/quantity taken from the DB so the
+ * server is the source of truth.
+ */
+async function buildPricedLineItems(fd: FormData, orderId: string): Promise<PricedLineItem[]> {
+  const items = await db.query.orderItems.findMany({
+    where: eq(orderItems.orderId, orderId),
+  });
+  return items.map((item) => ({
+    orderItemId: item.id,
+    description: item.itemName,
+    quantity: item.quantity,
+    unitPriceCents: dollarsToCents(fd, `price_${item.id}`),
+  }));
+}
+
+function readInvoiceInput(fd: FormData) {
+  return {
+    taxRateBps: Math.round(parseFloat(str(fd, "taxPercent") || "0") * 100) || 0,
+    taxLabel: nullableStr(fd, "taxLabel"),
+    overrideSubtotalCents: nullableDollarsToCents(fd, "overrideSubtotal"),
+  };
+}
 
 // ─── Loader ───────────────────────────────────────────────────────────────────
 
@@ -87,7 +132,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       orderBy: [asc(sounds.sortOrder), asc(sounds.title)],
     }),
     db.query.orders.findMany({
-      with: { items: true, user: true, emailNotifications: true },
+      with: {
+        items: true,
+        user: true,
+        emailNotifications: true,
+        invoice: { with: { lineItems: true } },
+      },
       orderBy: [desc(orders.createdAt)],
     }),
   ]);
@@ -209,10 +259,38 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // ── Orders ────────────────────────────────────────────────────────────
     case "update-order-status": {
-      await db
-        .update(orders)
-        .set({ status: str(fd, "status") as typeof orders.$inferSelect["status"], updatedAt: new Date() })
-        .where(eq(orders.id, str(fd, "id")));
+      const orderId = str(fd, "id");
+      const status = str(fd, "status") as typeof orders.$inferSelect["status"];
+      await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, orderId));
+      // Payment received → email the customer their official paid receipt.
+      // sendPaidReceipt is a no-op if there's no invoice or it's already paid.
+      if (status === "confirmed") {
+        try {
+          await sendPaidReceipt(orderId);
+        } catch (err) {
+          console.error("[admin] paid-receipt email failed", err);
+        }
+      }
+      break;
+    }
+
+    // ── Invoicing ─────────────────────────────────────────────────────────
+    case "save-invoice": {
+      const orderId = str(fd, "id");
+      const lineItems = await buildPricedLineItems(fd, orderId);
+      await saveInvoicePricing(orderId, { lineItems, ...readInvoiceInput(fd) });
+      break;
+    }
+    case "send-payment-email": {
+      const orderId = str(fd, "id");
+      try {
+        const lineItems = await buildPricedLineItems(fd, orderId);
+        await saveInvoicePricing(orderId, { lineItems, ...readInvoiceInput(fd) });
+        await sendPaymentEmail(orderId);
+      } catch (err) {
+        const message = err instanceof ReadableError ? err.message : "Failed to send payment email.";
+        return { ok: false, error: message };
+      }
       break;
     }
   }
@@ -664,6 +742,185 @@ const STATUS_COLORS: Record<string, string> = {
   refunded: "bg-red-100 text-red-700",
 };
 
+const INVOICE_STATUS_COLORS: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-600",
+  sent: "bg-blue-100 text-blue-800",
+  paid: "bg-green-100 text-green-800",
+};
+
+const TAX_PRESETS: { label: string; taxLabel: string; percent: string }[] = [
+  { label: "HST 13%", taxLabel: "HST", percent: "13" },
+  { label: "Exempt 0%", taxLabel: "Exempt", percent: "0" },
+];
+
+/** Format integer cents as a plain dollar string for a number input (e.g. 1250 → "12.50"). */
+function centsToInput(cents: number): string {
+  return cents > 0 ? (cents / 100).toFixed(2) : "";
+}
+
+function PricingPanel({ order }: { order: Order }) {
+  const fetcher = useFetcher<{ ok: boolean; error?: string }>();
+  const invoice = order.invoice;
+
+  // Prefill per-item prices from an existing invoice (matched by orderItemId), else blank.
+  const [prices, setPrices] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const item of order.items) {
+      const li = invoice?.lineItems.find((l) => l.orderItemId === item.id);
+      initial[item.id] = li ? centsToInput(li.unitPriceCents) : "";
+    }
+    return initial;
+  });
+  const [taxPercent, setTaxPercent] = useState(
+    invoice ? String(invoice.taxRateBps / 100) : "13"
+  );
+  const [taxLabel, setTaxLabel] = useState(invoice?.taxLabel ?? "HST");
+  const [overrideSubtotal, setOverrideSubtotal] = useState("");
+
+  // Live totals.
+  const summedCents = order.items.reduce(
+    (sum, item) => sum + Math.round((parseFloat(prices[item.id] || "0") || 0) * 100) * item.quantity,
+    0
+  );
+  const overrideCents =
+    overrideSubtotal.trim() !== "" ? Math.round((parseFloat(overrideSubtotal) || 0) * 100) : null;
+  const subtotalCents = overrideCents != null ? overrideCents : summedCents;
+  const taxCents = Math.round((subtotalCents * (Math.round(parseFloat(taxPercent || "0") * 100) || 0)) / 10000);
+  const totalCents = subtotalCents + taxCents;
+
+  const busy = fetcher.state !== "idle";
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs text-gray-400 font-sans font-bold">Pricing &amp; Invoice</p>
+        <div className="flex items-center gap-2">
+          {invoice && (
+            <>
+              <span className="text-xs text-gray-400 font-mono">{invoice.invoiceNumber}</span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${INVOICE_STATUS_COLORS[invoice.status] ?? "bg-gray-100 text-gray-600"}`}
+              >
+                {invoice.status}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <fetcher.Form method="post" className="flex flex-col gap-3">
+        <input type="hidden" name="id" value={order.id} />
+        <input type="hidden" name="taxPercent" value={taxPercent} />
+        <input type="hidden" name="taxLabel" value={taxLabel} />
+
+        {/* Per-item unit prices */}
+        <div className="flex flex-col gap-2">
+          {order.items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3">
+              <span className="flex-1 text-sm font-sans text-gray-700">
+                {item.itemName} <span className="text-gray-400">× {item.quantity}</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-gray-400 text-sm">$</span>
+                <Input
+                  name={`price_${item.id}`}
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  placeholder="0.00"
+                  value={prices[item.id]}
+                  onChange={(e) => setPrices((p) => ({ ...p, [item.id]: e.target.value }))}
+                  className="w-28"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tax + optional subtotal override */}
+        <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-gray-100">
+          <Field label="Tax rate (%)">
+            <Input
+              type="number"
+              step="0.01"
+              min={0}
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+              className="w-24"
+            />
+          </Field>
+          <Field label="Tax label">
+            <Input value={taxLabel} onChange={(e) => setTaxLabel(e.target.value)} className="w-28" />
+          </Field>
+          <div className="flex gap-1.5 pb-1">
+            {TAX_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => {
+                  setTaxPercent(preset.percent);
+                  setTaxLabel(preset.taxLabel);
+                }}
+                className="text-xs px-2.5 py-1 rounded-full font-bold font-sans bg-white border border-gray-200 text-gray-600 hover:border-brand-blue hover:text-brand-blue"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <Field label="Override subtotal ($)">
+            <Input
+              name="overrideSubtotal"
+              type="number"
+              step="0.01"
+              min={0}
+              placeholder="optional"
+              value={overrideSubtotal}
+              onChange={(e) => setOverrideSubtotal(e.target.value)}
+              className="w-32"
+            />
+          </Field>
+        </div>
+
+        {/* Live totals */}
+        <div className="flex flex-col gap-0.5 text-sm font-sans pt-2 border-t border-gray-100 ml-auto w-48">
+          <div className="flex justify-between text-gray-500">
+            <span>Subtotal</span>
+            <span>${(subtotalCents / 100).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-gray-500">
+            <span>{taxLabel || "Tax"} ({taxPercent || 0}%)</span>
+            <span>${(taxCents / 100).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between font-bold text-gray-900">
+            <span>Total</span>
+            <span>${(totalCents / 100).toFixed(2)}</span>
+          </div>
+        </div>
+
+        {fetcher.data && fetcher.data.ok === false && (
+          <p className="text-sm text-red-600 font-sans">{fetcher.data.error}</p>
+        )}
+
+        <div className="flex flex-wrap gap-2 justify-end pt-1">
+          <Button
+            type="submit"
+            name="intent"
+            value="save-invoice"
+            variant="primary-outline"
+            size="sm"
+            disabled={busy}
+          >
+            {busy ? "Saving…" : "Save prices"}
+          </Button>
+          <Button type="submit" name="intent" value="send-payment-email" size="sm" disabled={busy}>
+            {busy ? "Working…" : "Send payment email"}
+          </Button>
+        </div>
+      </fetcher.Form>
+    </div>
+  );
+}
+
 function OrderRow({ order }: { order: Order }) {
   const [expanded, setExpanded] = useState(false);
   const fetcher = useFetcher();
@@ -723,6 +980,17 @@ function OrderRow({ order }: { order: Order }) {
               <span>${(order.totalCents / 100).toFixed(2)}</span>
             </div>
           </div>
+
+          <div className="mb-4">
+            <a
+              href={`/admin/orders/${order.id}/manufacturer-xlsx`}
+              className="inline-flex items-center gap-2 text-sm font-sans font-bold text-brand-blue hover:underline"
+            >
+              <Download className="w-4 h-4" /> Download manufacturer sheet (.xlsx)
+            </a>
+          </div>
+
+          <PricingPanel order={order} />
 
           {order.emailNotifications.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-100 p-3 mb-4">

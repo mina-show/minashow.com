@@ -10,6 +10,8 @@ export default [
   route("auth/google/callback", "routes/auth.google.callback.tsx"),
   // Resource route for action runner — invoked from providers/components
   route("api/actions", "routes/api.actions.tsx"),
+  // Resource route — manufacturer .xlsx export (admin-only download)
+  route("admin/orders/:orderId/manufacturer-xlsx", "routes/admin.orders.$orderId.manufacturer-xlsx.tsx"),
   route("*", "routes/$.tsx"),
 
   // ── Main layout ───────────────────────────────────────────────────────────

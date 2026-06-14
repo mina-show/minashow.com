@@ -52,6 +52,12 @@ const serverEnvSchema = z.object({
    */
   EMAIL_DEV_REDIRECT_TO: z.string().optional(),
   /**
+   * Zeffy donation/payment form URL the customer is sent to in order to pay.
+   * Used in the payment-request email + PDF. Optional: when unset, the payment
+   * email omits the link (dev convenience).
+   */
+  ZEFFY_LINK: z.string().optional(),
+  /**
    * Cloudflare Turnstile site key (public — rendered in the widget).
    * Passed to the client via route loaders. Optional: when unset the widget is
    * not rendered (dev convenience).

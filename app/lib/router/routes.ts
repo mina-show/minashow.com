@@ -9,6 +9,7 @@ import { components, hooks, utils } from "~/lib/router/generouted-components";
 export const routePaths = [
   "/",
   "/admin",
+  "/admin/orders/:orderId/manufacturer-xlsx",
   "/api/actions",
   "/auth/google",
   "/auth/google/callback",
@@ -32,6 +33,7 @@ export type Path = (typeof routePaths)[number];
 
 // all params for any given path get defined here...
 export type Params = {
+  "/admin/orders/:orderId/manufacturer-xlsx": { orderId: string };
   "/package/:id": { id: string };
   "/product/:id": { id: string };
   "/shop/:category": { category: string };

@@ -28,6 +28,8 @@ export interface SendEmailInput {
    * Order mail passes EMAIL_FROM_ORDERS.
    */
   from?: string;
+  /** File attachments (e.g. invoice/receipt PDFs). `content` is the raw file bytes. */
+  attachments?: { filename: string; content: Buffer }[];
 }
 
 export interface SendEmailResult {
@@ -59,6 +61,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       bcc: input.bcc,
       subject: input.subject,
       replyTo: input.replyTo,
+      attachments: input.attachments?.map((a) => a.filename),
     });
     return {
       success: true,
@@ -77,6 +80,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       html: input.html,
       text: input.text,
       replyTo: input.replyTo,
+      attachments: input.attachments,
     });
 
     if (error) {
