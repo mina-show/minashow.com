@@ -29,6 +29,13 @@ export const emailStatusEnum = pgEnum("email_status", [
   "failed", // Failed to send
 ]);
 
+/** What action in the order lifecycle triggered the email. */
+export const emailTriggerEnum = pgEnum("email_trigger", [
+  "order-placed", // Customer submitted the order (admin alerts + receipt)
+  "payment-request", // Admin priced the order and sent Zeffy payment details
+  "paid-receipt", // Order confirmed → official paid receipt
+]);
+
 // ---------------------------------------------------------------------------
 // Tables
 // ---------------------------------------------------------------------------
@@ -188,6 +195,8 @@ export const emailNotifications = pgTable("email_notifications", {
   recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
   /** Role of the recipient: costume-admin, general-admin, info, customer */
   recipientRole: varchar("recipient_role", { length: 50 }),
+  /** The order-lifecycle action that triggered this email */
+  triggerEvent: emailTriggerEnum("trigger_event").notNull().default("order-placed"),
   subject: varchar("subject", { length: 500 }).notNull(),
   status: emailStatusEnum("status").notNull().default("queued"),
   sentAt: timestamp("sent_at"),

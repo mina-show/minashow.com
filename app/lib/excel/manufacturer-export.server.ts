@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { serverEnv } from "~/lib/env/env.defaults.server";
+import { packages } from "~/lib/data/packages";
 
 /** Minimal item shape needed for the manufacturer sheet. */
 export interface ManufacturerExportItem {
@@ -16,7 +17,57 @@ export interface ManufacturerExportOrder {
   items: ManufacturerExportItem[];
 }
 
+/** A single manufacturer-sheet line: one costume to produce. */
+interface ManufacturerRow {
+  imageUrl: string | null;
+  /** Costume name (or the package name for an unresolved/individual line). */
+  name: string;
+  /** Parent bundle name; empty for an individual (non-package) product. */
+  bundle: string;
+  quantity: number;
+}
+
 const IMAGE_PX = 88;
+
+/**
+ * Static packages keyed by name (lowercased). Order items only snapshot the
+ * package *name* — its id isn't persisted — so name is the link back to the
+ * bundle's costume list. Names are unique across packages.
+ */
+const packagesByName = new Map(packages.map((p) => [p.name.toLowerCase(), p]));
+
+/**
+ * Explode order items into manufacturer rows. We're billed per costume but sell
+ * bundles, so each package becomes one row per costume in it; the package's
+ * order quantity carries down to every costume. Individual products (or any
+ * package we can't resolve) stay a single row so nothing is dropped.
+ */
+function toManufacturerRows(items: ManufacturerExportItem[]): ManufacturerRow[] {
+  return items.flatMap((item) => {
+    const pkg =
+      item.itemType === "package"
+        ? packagesByName.get(item.itemName.toLowerCase())
+        : undefined;
+
+    if (pkg && pkg.images.length > 0) {
+      return pkg.images.map((img) => ({
+        imageUrl: img.src,
+        name: img.name,
+        bundle: pkg.name,
+        quantity: item.quantity,
+      }));
+    }
+
+    return [
+      {
+        imageUrl: item.itemImageUrl,
+        name: item.itemName,
+        bundle: item.itemType === "package" ? item.itemName : "",
+        quantity: item.quantity,
+      },
+    ];
+  });
+}
 
 /** Resolve a possibly-relative image URL to an absolute one using APP_FQDN. */
 function toAbsoluteUrl(url: string): string {
@@ -49,9 +100,10 @@ async function fetchImage(url: string): Promise<Buffer | null> {
 }
 
 /**
- * Build an .xlsx workbook for the manufacturer: one row per order item with an
- * embedded product image, the item name, type, and quantity. Images that can't
- * be fetched are skipped (the row still lists name/type/qty).
+ * Build an .xlsx workbook for the manufacturer: one row per costume to produce
+ * (bundles are exploded into their individual costumes) with an embedded image,
+ * the costume name, its parent bundle, and quantity. Images that can't be
+ * fetched are skipped (the row still lists name/bundle/qty).
  */
 export async function buildManufacturerWorkbook(
   order: ManufacturerExportOrder
@@ -65,7 +117,7 @@ export async function buildManufacturerWorkbook(
   sheet.columns = [
     { header: "Image", key: "image", width: 16 },
     { header: "Item", key: "name", width: 38 },
-    { header: "Type", key: "type", width: 16 },
+    { header: "Bundle", key: "bundle", width: 24 },
     { header: "Quantity", key: "quantity", width: 12 },
   ];
 
@@ -74,26 +126,28 @@ export async function buildManufacturerWorkbook(
   headerRow.font = { bold: true };
   headerRow.alignment = { vertical: "middle" };
 
+  const rows = toManufacturerRows(order.items);
+
   // Fetch all images up front (in parallel) so embedding is fast.
   const images = await Promise.all(
-    order.items.map((item) => (item.itemImageUrl ? fetchImage(item.itemImageUrl) : Promise.resolve(null)))
+    rows.map((r) => (r.imageUrl ? fetchImage(r.imageUrl) : Promise.resolve(null)))
   );
 
-  order.items.forEach((item, idx) => {
+  rows.forEach((line, idx) => {
     const row = sheet.addRow({
       image: "",
-      name: item.itemName,
-      type: item.itemType,
-      quantity: item.quantity,
+      name: line.name,
+      bundle: line.bundle,
+      quantity: line.quantity,
     });
     row.height = IMAGE_PX * 0.78; // points ≈ px * 0.75; small margin for padding
     row.alignment = { vertical: "middle" };
 
     const imageBuffer = images[idx];
-    if (imageBuffer && item.itemImageUrl) {
+    if (imageBuffer && line.imageUrl) {
       const imageId = workbook.addImage({
         buffer: imageBuffer as unknown as ExcelJS.Buffer,
-        extension: imageExtension(item.itemImageUrl),
+        extension: imageExtension(line.imageUrl),
       });
       // Anchor inside the first column of this row (0-based col/row).
       sheet.addImage(imageId, {

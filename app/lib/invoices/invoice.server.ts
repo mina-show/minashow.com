@@ -188,6 +188,7 @@ function toPdfArgs(
 async function logEmail(
   orderId: string,
   recipientEmail: string,
+  triggerEvent: "payment-request" | "paid-receipt",
   subject: string,
   result: { success: boolean; error: string | null }
 ): Promise<void> {
@@ -195,6 +196,7 @@ async function logEmail(
     orderId,
     recipientEmail,
     recipientRole: "customer",
+    triggerEvent,
     subject,
     status: result.success ? "sent" : "failed",
     sentAt: result.success ? new Date() : null,
@@ -227,7 +229,7 @@ export async function sendPaymentEmail(orderId: string): Promise<void> {
     .set({ status: "sent", sentAt: new Date(), sentToEmail: order.customerEmail, updatedAt: new Date() })
     .where(eq(invoices.id, invoice.id));
 
-  await logEmail(orderId, order.customerEmail, email.subject, result);
+  await logEmail(orderId, order.customerEmail, "payment-request", email.subject, result);
 }
 
 /**
@@ -263,5 +265,5 @@ export async function sendPaidReceipt(orderId: string): Promise<void> {
     .set({ status: "paid", paidAt: invoice.paidAt, updatedAt: new Date() })
     .where(eq(invoices.id, order.invoice.id));
 
-  await logEmail(orderId, order.customerEmail, email.subject, result);
+  await logEmail(orderId, order.customerEmail, "paid-receipt", email.subject, result);
 }

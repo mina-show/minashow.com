@@ -51,8 +51,8 @@ export default function ConfirmationPage() {
           )}
 
           <p className="text-gray-600 mb-8 leading-[1.7] font-sans">
-            Thank you for your order. Our team will review it and contact you
-            within 1–2 business days with next steps.
+            Thank you for your order — you'll receive a confirmation email
+            shortly with your order details.
           </p>
 
           {/* Process steps */}
@@ -74,14 +74,14 @@ export default function ConfirmationPage() {
                 to="/dashboard"
                 className="flex-1 py-3 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-center font-sans font-bold"
               >
-                My orders
+                See order details
               </Link>
             )}
             <Link
-              to="/shop"
+              to="/"
               className="flex-1 py-3 rounded-full bg-brand-blue text-white transition-colors text-center hover:opacity-90 font-sans font-extrabold"
             >
-              Back to shop
+              Go back home
             </Link>
           </div>
         </div>

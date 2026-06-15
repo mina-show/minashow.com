@@ -143,6 +143,8 @@ export async function routeOrderEmails(
   });
 
   // Fan-out — never throws; each result is captured for DB logging.
+  // The archive BCC only applies to internal admin/info mail — the customer
+  // receipt must go to the customer alone.
   const results = await Promise.allSettled(
     dispatched.map((p) =>
       sendEmail({
@@ -151,7 +153,7 @@ export async function routeOrderEmails(
         html: p.html,
         text: p.text,
         replyTo: p.replyTo,
-        bcc: ARCHIVE_BCC,
+        bcc: p.recipientRole === "customer" ? undefined : ARCHIVE_BCC,
         from: serverEnv.EMAIL_FROM_ORDERS,
       })
     )
@@ -167,6 +169,7 @@ export async function routeOrderEmails(
         orderId: context.orderId,
         recipientEmail: p.recipientEmail,
         recipientRole: p.recipientRole,
+        triggerEvent: "order-placed" as const,
         subject: p.subject,
         status: r.success ? ("sent" as const) : ("failed" as const),
         sentAt: r.success ? new Date() : null,
@@ -181,6 +184,7 @@ export async function routeOrderEmails(
       orderId: context.orderId,
       recipientEmail: p.recipientEmail,
       recipientRole: p.recipientRole,
+      triggerEvent: "order-placed" as const,
       subject: p.subject,
       status: "failed" as const,
       sentAt: null,

@@ -54,7 +54,7 @@ export default createActionHandler(
         const unitPriceCents = Math.round(item.price * 100);
         return {
           orderId: order.id,
-          itemType: item.category === "packages" ? "package" : "product",
+          itemType: item.category === "package" ? "package" : "product",
           itemName: item.name,
           itemImageUrl: item.image,
           quantity: item.quantity,

@@ -753,6 +753,24 @@ const TAX_PRESETS: { label: string; taxLabel: string; percent: string }[] = [
   { label: "Exempt 0%", taxLabel: "Exempt", percent: "0" },
 ];
 
+/** Friendly label for the action that triggered each email notification. */
+const EMAIL_TRIGGER_LABELS: Record<string, string> = {
+  "order-placed": "Order placed",
+  "payment-request": "Payment request sent",
+  "paid-receipt": "Marked confirmed",
+};
+
+/** Format a timestamp as "14 Jun 2026, 15:04". */
+function formatDateTime(date: Date | string): string {
+  return new Date(date).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /** Format integer cents as a plain dollar string for a number input (e.g. 1250 → "12.50"). */
 function centsToInput(cents: number): string {
   return cents > 0 ? (cents / 100).toFixed(2) : "";
@@ -1008,8 +1026,12 @@ function OrderRow({ order }: { order: Order }) {
                   >
                     {n.status}
                   </span>
+                  <span className="text-[11px] font-bold text-brand-blue">
+                    {EMAIL_TRIGGER_LABELS[n.triggerEvent] ?? n.triggerEvent}
+                  </span>
                   <span className="text-xs text-gray-500 font-mono">{n.recipientRole}</span>
                   <span className="flex-1 text-gray-700 truncate">{n.recipientEmail}</span>
+                  <span className="text-xs text-gray-400 font-mono">{formatDateTime(n.sentAt ?? n.createdAt)}</span>
                   {n.errorMessage && (
                     <span className="text-xs text-red-500 w-full sm:w-auto">{n.errorMessage}</span>
                   )}
