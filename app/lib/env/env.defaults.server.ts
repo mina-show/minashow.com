@@ -58,6 +58,12 @@ const serverEnvSchema = z.object({
    */
   ZEFFY_LINK: z.string().optional(),
   /**
+   * Interac e-Transfer instructions shown to the customer in the payment-request
+   * email + PDF (e.g. the destination email and any security question/answer).
+   * Optional: when unset, the e-transfer payment option is omitted.
+   */
+  ETRANSFER_INSTRUCTIONS: z.string().optional(),
+  /**
    * Cloudflare Turnstile site key (public — rendered in the widget).
    * Passed to the client via route loaders. Optional: when unset the widget is
    * not rendered (dev convenience).

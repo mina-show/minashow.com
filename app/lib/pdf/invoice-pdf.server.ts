@@ -27,6 +27,8 @@ export interface InvoicePdfInvoice {
   taxRateBps: number;
   taxCents: number;
   totalCents: number;
+  /** How the customer paid — shown on the receipt */
+  paymentMethod?: "etransfer" | "zeffy" | null;
   paidAt?: Date | null;
 }
 
@@ -34,19 +36,26 @@ export interface BuildInvoicePdfArgs {
   order: InvoicePdfOrder;
   invoice: InvoicePdfInvoice;
   lineItems: InvoicePdfLineItem[];
-  /** payment-request = shows Zeffy payment instructions; receipt = marked PAID */
+  /** payment-request = shows payment instructions; receipt = marked PAID */
   mode: "payment-request" | "receipt";
   /** Zeffy payment URL — only used in payment-request mode */
   zeffyLink?: string | null;
+  /** Interac e-Transfer instructions — only used in payment-request mode */
+  etransferInstructions?: string | null;
 }
 
 function money(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+/** Human-readable label for a recorded payment method. */
+function paymentMethodLabel(method: "etransfer" | "zeffy"): string {
+  return method === "etransfer" ? "Interac e-Transfer" : "Zeffy";
+}
+
 /** Build the invoice/receipt PDF and resolve with its bytes. */
 export function buildInvoicePdf(args: BuildInvoicePdfArgs): Promise<Buffer> {
-  const { order, invoice, lineItems, mode, zeffyLink } = args;
+  const { order, invoice, lineItems, mode, zeffyLink, etransferInstructions } = args;
   const shortId = order.id.slice(0, 8);
   const isReceipt = mode === "receipt";
 
@@ -84,6 +93,17 @@ export function buildInvoicePdf(args: BuildInvoicePdfArgs): Promise<Buffer> {
         width: contentWidth,
         align: "right",
       });
+    if (invoice.paymentMethod) {
+      doc
+        .fillColor(MUTED_GRAY)
+        .font("Helvetica")
+        .text(`Paid via ${paymentMethodLabel(invoice.paymentMethod)}`, { width: contentWidth, align: "right" });
+    }
+  } else {
+    doc
+      .fillColor("#b91c1c")
+      .font("Helvetica-Bold")
+      .text("UNPAID — PENDING PAYMENT", { width: contentWidth, align: "right" });
   }
 
   // ── Bill-to ─────────────────────────────────────────────────────────────
@@ -147,16 +167,27 @@ export function buildInvoicePdf(args: BuildInvoicePdfArgs): Promise<Buffer> {
   if (!isReceipt) {
     doc.fontSize(11).font("Helvetica-Bold").fillColor(TEXT_GRAY).text("How to pay", left, y);
     doc.moveDown(0.4);
+
+    // Option 1 — Zeffy
+    doc.fontSize(10).font("Helvetica-Bold").fillColor(TEXT_GRAY).text("Option 1 — Pay online (Zeffy)");
     doc.fontSize(10).font("Helvetica").fillColor(MUTED_GRAY);
     if (zeffyLink) {
-      doc.text("1. Open the secure payment form:", { continued: false });
+      doc.text("Open the secure payment form:", { continued: false });
       doc.fillColor(BRAND_BLUE).text(zeffyLink, { link: zeffyLink, underline: true });
       doc.fillColor(MUTED_GRAY);
     } else {
-      doc.text("1. Open the secure payment form provided by our team.");
+      doc.text("Open the secure payment form provided by our team.");
     }
-    doc.text(`2. Enter your order number "${shortId}" in the note field.`);
-    doc.text(`3. Enter the total amount ${money(invoice.totalCents)} and complete payment.`);
+    doc.text(`Enter your order number "${shortId}" in the note field, then pay ${money(invoice.totalCents)}.`);
+
+    // Option 2 — Interac e-Transfer
+    if (etransferInstructions) {
+      doc.moveDown(0.6);
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(TEXT_GRAY).text("Option 2 — Interac e-Transfer");
+      doc.fontSize(10).font("Helvetica").fillColor(MUTED_GRAY).text(etransferInstructions);
+      doc.text(`Include your order number "${shortId}" and send the total ${money(invoice.totalCents)}.`);
+    }
+
     doc.moveDown(0.6);
     doc.fontSize(9).fillColor(MUTED_GRAY).text(
       "Once your payment is received we'll email you an official paid receipt for your records."

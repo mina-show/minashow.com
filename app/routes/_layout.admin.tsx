@@ -15,6 +15,7 @@ import {
   saveInvoicePricing,
   sendPaymentEmail,
   sendPaidReceipt,
+  recordPaymentMethod,
   type PricedLineItem,
 } from "~/lib/invoices/invoice.server";
 import { ReadableError } from "~/lib/readable-error";
@@ -262,10 +263,15 @@ export async function action({ request }: ActionFunctionArgs) {
       const orderId = str(fd, "id");
       const status = str(fd, "status") as typeof orders.$inferSelect["status"];
       await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, orderId));
-      // Payment received → email the customer their official paid receipt.
-      // sendPaidReceipt is a no-op if there's no invoice or it's already paid.
+      // Payment received → record the method (for tracking + receipt), then email
+      // the customer their official paid receipt. sendPaidReceipt is a no-op if
+      // there's no invoice or it's already paid.
       if (status === "confirmed") {
         try {
+          const method = str(fd, "paymentMethod");
+          if (method === "etransfer" || method === "zeffy") {
+            await recordPaymentMethod(orderId, method);
+          }
           await sendPaidReceipt(orderId);
         } catch (err) {
           console.error("[admin] paid-receipt email failed", err);
@@ -942,6 +948,8 @@ function PricingPanel({ order }: { order: Order }) {
 function OrderRow({ order }: { order: Order }) {
   const [expanded, setExpanded] = useState(false);
   const fetcher = useFetcher();
+  // Payment method recorded when confirming payment (for tracking + receipt).
+  const [paymentMethod, setPaymentMethod] = useState<string>(order.invoice?.paymentMethod ?? "etransfer");
 
   return (
     <div className="bg-white border-b border-gray-100 last:border-0">
@@ -955,7 +963,7 @@ function OrderRow({ order }: { order: Order }) {
         <span className="font-mono text-xs text-gray-500 hidden sm:block">{order.id.slice(0, 8)}…</span>
         <span className="flex-1 font-sans text-sm text-gray-700 font-semibold">{order.customerName}</span>
         <span className="text-sm font-sans font-bold text-gray-900">
-          ${(order.totalCents / 100).toFixed(2)}
+          ${((order.invoice?.totalCents ?? order.totalCents) / 100).toFixed(2)}
         </span>
         <span className="text-xs text-gray-400 font-sans hidden md:block">
           {new Date(order.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
@@ -987,15 +995,26 @@ function OrderRow({ order }: { order: Order }) {
 
           <div className="bg-white rounded-xl border border-gray-100 p-3 mb-4">
             <p className="text-xs text-gray-400 font-sans font-bold mb-2">Items</p>
-            {order.items.map((item) => (
-              <div key={item.id} className="flex justify-between py-1 border-b border-gray-50 last:border-0 text-sm font-sans">
-                <span className="text-gray-700">{item.itemName} × {item.quantity}</span>
-                <span className="font-bold text-gray-900">${(item.lineTotalCents / 100).toFixed(2)}</span>
-              </div>
-            ))}
+            {order.items.map((item) => {
+              // Quote orders carry $0 on the order item — the priced value lives
+              // on the matching invoice line, so prefer it once priced.
+              const priced = order.invoice?.lineItems.find((li) => li.orderItemId === item.id);
+              return (
+                <div key={item.id} className="flex justify-between py-1 border-b border-gray-50 last:border-0 text-sm font-sans">
+                  <span className="text-gray-700">{item.itemName} × {item.quantity}</span>
+                  {priced ? (
+                    <span className="font-bold text-gray-900">${(priced.lineTotalCents / 100).toFixed(2)}</span>
+                  ) : (
+                    <span className="text-amber-700 text-xs font-semibold">Pricing pending</span>
+                  )}
+                </div>
+              );
+            })}
             <div className="flex justify-between pt-2 text-sm font-sans font-bold">
               <span>Total</span>
-              <span>${(order.totalCents / 100).toFixed(2)}</span>
+              <span>
+                ${((order.invoice?.totalCents ?? order.totalCents) / 100).toFixed(2)}
+              </span>
             </div>
           </div>
 
@@ -1040,6 +1059,19 @@ function OrderRow({ order }: { order: Order }) {
             </div>
           )}
 
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="text-xs text-gray-500 font-sans font-semibold">
+              Payment method <span className="text-gray-400">(recorded on confirm)</span>:
+            </span>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="etransfer">Interac e-Transfer</SelectItem>
+                <SelectItem value="zeffy">Zeffy</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-500 font-sans font-semibold">Update status:</span>
             {ORDER_STATUSES.map((s) => (
@@ -1047,6 +1079,7 @@ function OrderRow({ order }: { order: Order }) {
                 <input type="hidden" name="intent" value="update-order-status" />
                 <input type="hidden" name="id" value={order.id} />
                 <input type="hidden" name="status" value={s} />
+                <input type="hidden" name="paymentMethod" value={paymentMethod} />
                 <button
                   type="submit"
                   disabled={order.status === s || fetcher.state !== "idle"}

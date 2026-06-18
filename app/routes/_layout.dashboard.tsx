@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Package, ChevronDown, ChevronUp, FileText, Download } from "lucide-react";
 import { useAuth } from "~/components/providers/auth-provider";
 import { forbidAdmin } from "~/lib/auth/admin.server";
 import { db } from "~/lib/db/client";
@@ -34,7 +34,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const userOrders = await db.query.orders.findMany({
     where: eq(orders.userId, user.id),
-    with: { items: true },
+    with: { items: true, invoice: { with: { lineItems: true } } },
     orderBy: [desc(orders.createdAt)],
   });
 
@@ -45,6 +45,80 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 type LoaderData = Awaited<ReturnType<typeof loader>>;
 type DBOrder = LoaderData["userOrders"][number];
+type DBInvoice = NonNullable<DBOrder["invoice"]>;
+
+// ─── Invoice helpers ─────────────────────────────────────────────────────────
+
+const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  etransfer: "Interac e-Transfer",
+  zeffy: "Zeffy",
+};
+
+/** Priced invoice panel shown to the customer once the admin has set prices. */
+function InvoicePanel({ order, invoice }: { order: DBOrder; invoice: DBInvoice }) {
+  const isPaid = invoice.status === "paid";
+  return (
+    <div className="mt-4 bg-white rounded-xl border border-gray-100 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-brand-blue" />
+          <span className="font-sans font-bold text-gray-900 text-sm">Invoice</span>
+          <span className="text-xs text-gray-400 font-mono">{invoice.invoiceNumber}</span>
+        </div>
+        <span
+          className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+            isPaid ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
+          }`}
+        >
+          {isPaid ? "Paid" : "Pending payment"}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1 mb-3">
+        {invoice.lineItems.map((li) => (
+          <div key={li.id} className="flex justify-between text-sm font-sans">
+            <span className="text-gray-700">
+              {li.description} <span className="text-gray-400">× {li.quantity}</span>
+            </span>
+            <span className="text-gray-900 font-semibold">{money(li.lineTotalCents)}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-0.5 text-sm font-sans pt-2 border-t border-gray-100 ml-auto w-52">
+        <div className="flex justify-between text-gray-500">
+          <span>Subtotal</span>
+          <span>{money(invoice.subtotalCents)}</span>
+        </div>
+        <div className="flex justify-between text-gray-500">
+          <span>
+            {invoice.taxLabel ?? "Tax"} ({(invoice.taxRateBps / 100).toFixed(2).replace(/\.00$/, "")}%)
+          </span>
+          <span>{money(invoice.taxCents)}</span>
+        </div>
+        <div className="flex justify-between font-bold text-gray-900">
+          <span>Total</span>
+          <span>{money(invoice.totalCents)}</span>
+        </div>
+      </div>
+
+      {isPaid && invoice.paymentMethod && (
+        <p className="text-xs text-gray-500 font-sans mt-2">
+          Paid via {PAYMENT_METHOD_LABELS[invoice.paymentMethod] ?? invoice.paymentMethod}
+        </p>
+      )}
+
+      <a
+        href={`/orders/${order.id}/invoice-pdf`}
+        className="mt-3 inline-flex items-center gap-2 text-sm font-sans font-bold text-brand-blue hover:underline"
+      >
+        <Download className="w-4 h-4" /> Download {isPaid ? "receipt" : "invoice"} (PDF)
+      </a>
+    </div>
+  );
+}
 
 type TabKey = "all" | "pending" | "confirmed" | "processing" | "delivered";
 
@@ -83,9 +157,13 @@ function OrderCard({ order }: { order: DBOrder }) {
         </div>
 
         <div className="text-right">
-          <p className="text-gray-900 font-display font-semibold text-[1.1rem]">
-            ${(order.totalCents / 100).toFixed(2)}
-          </p>
+          {order.invoice || order.totalCents > 0 ? (
+            <p className="text-gray-900 font-display font-semibold text-[1.1rem]">
+              {money(order.invoice?.totalCents ?? order.totalCents)}
+            </p>
+          ) : (
+            <p className="text-amber-700 font-sans font-semibold text-sm">Pricing pending</p>
+          )}
         </div>
 
         <button
@@ -98,24 +176,30 @@ function OrderCard({ order }: { order: DBOrder }) {
 
       {expanded && (
         <div className="border-t border-gray-100 p-4 sm:p-5 bg-gray-50">
-          <div className="flex flex-col gap-2 mb-4">
-            {order.items.map((item) => (
-              <div key={item.id} className="flex justify-between items-center">
-                <span className="text-gray-700 text-sm font-sans">
-                  {item.itemName} × {item.quantity}
-                </span>
-                <span className="text-gray-700 text-sm font-sans font-bold">
-                  ${(item.lineTotalCents / 100).toFixed(2)}
-                </span>
-              </div>
-            ))}
-          </div>
+          {/* Once priced, the invoice panel below is the source of truth for
+              items + prices. Until then, show what was ordered (prices pending). */}
+          {!order.invoice && (
+            <div className="flex flex-col gap-2 mb-4">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex justify-between items-center">
+                  <span className="text-gray-700 text-sm font-sans">
+                    {item.itemName} × {item.quantity}
+                  </span>
+                  <span className="text-amber-700 text-xs font-sans font-semibold">
+                    Pricing pending
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {order.notes && (
             <p className="text-gray-500 text-sm font-sans">
               <span className="font-semibold">Notes:</span> {order.notes}
             </p>
           )}
+
+          {order.invoice && <InvoicePanel order={order} invoice={order.invoice} />}
         </div>
       )}
     </div>

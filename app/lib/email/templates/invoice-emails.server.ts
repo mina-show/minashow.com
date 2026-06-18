@@ -33,6 +33,15 @@ export interface InvoiceEmailContext {
   totalCents: number;
   /** payment-request only */
   zeffyLink?: string | null;
+  /** payment-request only — Interac e-Transfer instructions */
+  etransferInstructions?: string | null;
+  /** paid-receipt only — how the customer paid */
+  paymentMethod?: "etransfer" | "zeffy" | null;
+}
+
+/** Human-readable label for a recorded payment method. */
+function paymentMethodLabel(method: "etransfer" | "zeffy"): string {
+  return method === "etransfer" ? "Interac e-Transfer" : "Zeffy";
 }
 
 function escapeHtml(s: string): string {
@@ -119,24 +128,29 @@ function shell(args: { headline: string; intro: string; ctx: InvoiceEmailContext
 export function renderPaymentRequestEmail(
   ctx: InvoiceEmailContext
 ): { subject: string; html: string; text: string } {
-  const subject = `Your Minashow order ${ctx.shortOrderId} — payment details`;
+  const subject = `Unpaid invoice ${ctx.invoiceNumber} — Minashow order ${ctx.shortOrderId}`;
   const linkHtml = ctx.zeffyLink
     ? `<a href="${escapeHtml(ctx.zeffyLink)}" style="color:${BRAND_BLUE};font-weight:600;">${escapeHtml(ctx.zeffyLink)}</a>`
     : "the secure payment form provided by our team";
+  const etransferBlock = ctx.etransferInstructions
+    ? `<br/><strong style="color:${TEXT_GRAY};">Option 2 — Interac e-Transfer</strong><br/>
+    ${escapeHtml(ctx.etransferInstructions).replace(/\n/g, "<br/>")}<br/>
+    Include your order number <strong>${escapeHtml(ctx.shortOrderId)}</strong> and send the total <strong>${money(ctx.totalCents)}</strong>.<br/>`
+    : "";
   const footer = `
-    <strong style="color:${TEXT_GRAY};">How to pay</strong><br/>
-    1. Open ${linkHtml}.<br/>
-    2. Enter your order number <strong>${escapeHtml(ctx.shortOrderId)}</strong> in the note field.<br/>
-    3. Enter the total amount <strong>${money(ctx.totalCents)}</strong> and complete payment.<br/><br/>
+    <strong style="color:${TEXT_GRAY};">How to pay</strong><br/><br/>
+    <strong style="color:${TEXT_GRAY};">Option 1 — Pay online (Zeffy)</strong><br/>
+    Open ${linkHtml}, enter your order number <strong>${escapeHtml(ctx.shortOrderId)}</strong> in the note field, then pay <strong>${money(ctx.totalCents)}</strong>.<br/>
+    ${etransferBlock}<br/>
     Once your payment is received, we'll email you an official paid receipt for your records.`;
   const html = shell({
-    headline: "Your order is priced and ready for payment",
-    intro: `Hi ${escapeHtml(ctx.customerName.split(" ")[0])}, here are the final details for your order. Please follow the steps below to pay.`,
+    headline: "Unpaid invoice — pending payment",
+    intro: `Hi ${escapeHtml(ctx.customerName.split(" ")[0])}, your order is priced and ready for payment. Please use one of the options below to pay.`,
     ctx,
     footer,
   });
-  const text = `Your Minashow order ${ctx.shortOrderId} — payment details
-Invoice ${ctx.invoiceNumber}
+  const text = `Unpaid invoice ${ctx.invoiceNumber} — Minashow order ${ctx.shortOrderId}
+PENDING PAYMENT
 
 ${ctx.items.map((i) => `  • ${i.name} × ${i.quantity} — ${money(i.lineTotalCents)}`).join("\n")}
 Subtotal: ${money(ctx.subtotalCents)}
@@ -144,10 +158,10 @@ ${ctx.taxLabel ?? "Tax"}: ${money(ctx.taxCents)}
 Total: ${money(ctx.totalCents)}
 
 How to pay:
-1. Open ${ctx.zeffyLink ?? "the secure payment form provided by our team"}
-2. Enter your order number "${ctx.shortOrderId}" in the note field.
-3. Enter the total amount ${money(ctx.totalCents)} and complete payment.
-
+Option 1 — Pay online (Zeffy)
+  Open ${ctx.zeffyLink ?? "the secure payment form provided by our team"}
+  Enter your order number "${ctx.shortOrderId}" in the note field, then pay ${money(ctx.totalCents)}.
+${ctx.etransferInstructions ? `\nOption 2 — Interac e-Transfer\n  ${ctx.etransferInstructions}\n  Include your order number "${ctx.shortOrderId}" and send the total ${money(ctx.totalCents)}.\n` : ""}
 A PDF copy is attached.`;
   return { subject, html, text };
 }
@@ -157,7 +171,8 @@ export function renderPaidReceiptEmail(
   ctx: InvoiceEmailContext
 ): { subject: string; html: string; text: string } {
   const subject = `Receipt for your Minashow order ${ctx.shortOrderId} — invoice ${ctx.invoiceNumber}`;
-  const footer = `Payment received in full — thank you! This email and the attached PDF serve as your official receipt (invoice ${escapeHtml(ctx.invoiceNumber)}) for your records.`;
+  const paidVia = ctx.paymentMethod ? ` (paid via ${paymentMethodLabel(ctx.paymentMethod)})` : "";
+  const footer = `Payment received in full${paidVia} — thank you! This email and the attached PDF serve as your official receipt (invoice ${escapeHtml(ctx.invoiceNumber)}) for your records.`;
   const html = shell({
     headline: "Payment received — here's your receipt",
     intro: `Hi ${escapeHtml(ctx.customerName.split(" ")[0])}, we've received your payment. Your official receipt is below and attached as a PDF.`,
@@ -172,6 +187,6 @@ Subtotal: ${money(ctx.subtotalCents)}
 ${ctx.taxLabel ?? "Tax"}: ${money(ctx.taxCents)}
 Total: ${money(ctx.totalCents)}
 
-Payment received in full — thank you! The attached PDF is your official receipt for your records.`;
+Payment received in full${ctx.paymentMethod ? ` (paid via ${paymentMethodLabel(ctx.paymentMethod)})` : ""} — thank you! The attached PDF is your official receipt for your records.`;
   return { subject, html, text };
 }

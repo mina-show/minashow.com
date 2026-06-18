@@ -142,6 +142,7 @@ function toEmailContext(
     taxRateBps: invoice.taxRateBps,
     taxCents: invoice.taxCents,
     totalCents: invoice.totalCents,
+    paymentMethod: invoice.paymentMethod,
   };
 }
 
@@ -172,6 +173,7 @@ function toPdfArgs(
       taxRateBps: invoice.taxRateBps,
       taxCents: invoice.taxCents,
       totalCents: invoice.totalCents,
+      paymentMethod: invoice.paymentMethod,
       paidAt: invoice.paidAt,
     },
     lineItems: invoice.lineItems.map((li) => ({
@@ -210,9 +212,15 @@ async function logEmail(
  */
 export async function sendPaymentEmail(orderId: string): Promise<void> {
   const { order, invoice } = await loadInvoiceContext(orderId);
-  const ctx = { ...toEmailContext(order, invoice), zeffyLink: serverEnv.ZEFFY_LINK ?? null };
+  const zeffyLink = serverEnv.ZEFFY_LINK ?? null;
+  const etransferInstructions = serverEnv.ETRANSFER_INSTRUCTIONS ?? null;
+  const ctx = { ...toEmailContext(order, invoice), zeffyLink, etransferInstructions };
 
-  const pdf = await buildInvoicePdf({ ...toPdfArgs(order, invoice, "payment-request"), zeffyLink: serverEnv.ZEFFY_LINK ?? null });
+  const pdf = await buildInvoicePdf({
+    ...toPdfArgs(order, invoice, "payment-request"),
+    zeffyLink,
+    etransferInstructions,
+  });
   const email = renderPaymentRequestEmail(ctx);
 
   const result = await sendEmail({
@@ -266,4 +274,47 @@ export async function sendPaidReceipt(orderId: string): Promise<void> {
     .where(eq(invoices.id, order.invoice.id));
 
   await logEmail(orderId, order.customerEmail, "paid-receipt", email.subject, result);
+}
+
+/** A recorded payment method. */
+export type PaymentMethod = "etransfer" | "zeffy";
+
+/**
+ * Record how the customer paid on the order's invoice (for tracking + the
+ * receipt). No-op when the order has no invoice yet. Call before
+ * {@link sendPaidReceipt} so the receipt reflects the method.
+ */
+export async function recordPaymentMethod(orderId: string, method: PaymentMethod): Promise<void> {
+  await db
+    .update(invoices)
+    .set({ paymentMethod: method, updatedAt: new Date() })
+    .where(eq(invoices.orderId, orderId));
+}
+
+/**
+ * Build the customer-facing invoice PDF for an order they own. Returns the PDF
+ * bytes + a download filename. Throws (ReadableError) when the order isn't
+ * theirs or hasn't been priced yet. Paid invoices render as an official receipt.
+ */
+export async function buildCustomerInvoicePdf(
+  orderId: string,
+  userId: string
+): Promise<{ buffer: Buffer; filename: string }> {
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+    with: { invoice: { with: { lineItems: true } } },
+  });
+  if (!order || order.userId !== userId) throw new ReadableError("Order not found.");
+  if (!order.invoice) throw new ReadableError("This order has not been invoiced yet.");
+
+  const invoice = order.invoice;
+  const isPaid = invoice.status === "paid";
+  const buffer = await buildInvoicePdf({
+    ...toPdfArgs(order, invoice, isPaid ? "receipt" : "payment-request"),
+    zeffyLink: isPaid ? undefined : serverEnv.ZEFFY_LINK ?? null,
+    etransferInstructions: isPaid ? undefined : serverEnv.ETRANSFER_INSTRUCTIONS ?? null,
+  });
+
+  const prefix = isPaid ? "receipt" : "invoice";
+  return { buffer, filename: `${prefix}-${invoice.invoiceNumber}.pdf` };
 }

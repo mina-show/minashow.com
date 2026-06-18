@@ -12,6 +12,8 @@ export default [
   route("api/actions", "routes/api.actions.tsx"),
   // Resource route — manufacturer .xlsx export (admin-only download)
   route("admin/orders/:orderId/manufacturer-xlsx", "routes/admin.orders.$orderId.manufacturer-xlsx.tsx"),
+  // Resource route — customer invoice/receipt PDF download (owner-only)
+  route("orders/:orderId/invoice-pdf", "routes/orders.$orderId.invoice-pdf.tsx"),
   route("*", "routes/$.tsx"),
 
   // ── Main layout ───────────────────────────────────────────────────────────

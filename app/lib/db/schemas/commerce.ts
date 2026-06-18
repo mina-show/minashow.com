@@ -23,6 +23,12 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "paid", // Customer has paid
 ]);
 
+/** How the customer paid — recorded by the admin at confirmation for tracking. */
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "etransfer", // Interac e-Transfer
+  "zeffy", // Zeffy payment form
+]);
+
 export const emailStatusEnum = pgEnum("email_status", [
   "queued", // Waiting to be sent
   "sent", // Successfully sent
@@ -161,6 +167,8 @@ export const invoices = pgTable("invoices", {
   taxCents: integer("tax_cents").notNull().default(0),
   /** Final amount due/charged = subtotal + tax (cents) */
   totalCents: integer("total_cents").notNull().default(0),
+  /** How the customer paid — set by the admin when confirming payment */
+  paymentMethod: paymentMethodEnum("payment_method"),
   /** When payment was recorded (invoice marked paid) */
   paidAt: timestamp("paid_at"),
   sentAt: timestamp("sent_at"),
